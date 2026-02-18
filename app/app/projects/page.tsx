@@ -13,6 +13,12 @@ export default async function ProjectsPage() {
     .from('projects')
     .select('id, name, status, created_at')
     .order('created_at', { ascending: false });
+  const projectRows = (projects ?? []) as Array<{
+    id: string;
+    name: string | null;
+    status: string | null;
+    created_at: string | null;
+  }>;
 
   if (error) {
     return (
@@ -26,16 +32,17 @@ export default async function ProjectsPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-4">Projetos</h1>
-      {projects && projects.length > 0 ? (
+      {projectRows.length > 0 ? (
         <ul className="space-y-2">
-          {projects.map((project) => (
+          {projectRows.map((project) => (
             <li key={project.id} className="p-4 border rounded">
               <div className="flex justify-between items-center">
                 <span className="font-semibold">{project.name}</span>
                 <span className="text-sm text-gray-600">{project.status}</span>
               </div>
               <p className="text-xs text-gray-500">
-                Criado em {new Date(project.created_at as string).toLocaleDateString('pt-BR')}
+                Criado em{' '}
+                {new Date(project.created_at ?? Date.now()).toLocaleDateString('pt-BR')}
               </p>
             </li>
           ))}

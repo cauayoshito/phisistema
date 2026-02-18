@@ -6,6 +6,7 @@ import {
   BarChart3,
   Building2,
   CircleHelp,
+  CircleUserRound,
   LayoutDashboard,
   LogOut,
   FolderOpen,
@@ -68,6 +69,13 @@ const mainItems: NavItem[] = [
     href: '/relatorios',
     icon: BarChart3,
     match: (pathname) => pathname.includes('/relatorios'),
+  },
+  {
+    id: 'investidor',
+    label: 'Painel do Investidor',
+    href: '/investidor',
+    icon: CircleUserRound,
+    match: (pathname) => pathname === '/investidor' || pathname.startsWith('/investidor/'),
   },
   {
     id: 'seguranca',

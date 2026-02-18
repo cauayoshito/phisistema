@@ -10,24 +10,32 @@ import type { Database } from '@/types/database';
  */
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
+  const isDevelopment = process.env.NODE_ENV === 'development';
+
+  if (isDevelopment) {
+    return res;
+  }
+
   const supabase = createMiddlewareClient<Database>({ req, res });
   const {
     data: { session },
   } = await supabase.auth.getSession();
 
   const pathname = req.nextUrl.pathname;
+  const isDashboardRoute = pathname === '/dashboard' || pathname.startsWith('/dashboard/');
+  const isLoginRoute = pathname === '/login';
 
-  // If the user is not logged in and not already on the login page, redirect them
-  if (!session && pathname !== '/login') {
+  // Protect only the dashboard area. Avoid intercepting Next internals/assets.
+  if (!session && isDashboardRoute) {
     const redirectUrl = req.nextUrl.clone();
     redirectUrl.pathname = '/login';
     return NextResponse.redirect(redirectUrl);
   }
 
-  // If the user is logged in and tries to access the login page, redirect to dashboard
-  if (session && pathname === '/login') {
+  // Logged in users should not stay on the login page.
+  if (session && isLoginRoute) {
     const redirectUrl = req.nextUrl.clone();
-    redirectUrl.pathname = '/app/dashboard';
+    redirectUrl.pathname = '/dashboard';
     return NextResponse.redirect(redirectUrl);
   }
 
@@ -36,5 +44,5 @@ export async function middleware(req: NextRequest) {
 
 // Apply middleware to all routes except for static assets and the Next.js internals
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/dashboard/:path*', '/login'],
 };

@@ -19,6 +19,11 @@ export default async function OrganizationsPage() {
   const { data: organizations, error } = await supabase
     .from('organizations')
     .select('*');
+  const organizationRows = (organizations ?? []) as Array<{
+    id: string;
+    name: string | null;
+    email: string | null;
+  }>;
 
   if (error) {
     // If there is an error (e.g., due to missing RLS policy) display a message
@@ -33,9 +38,9 @@ export default async function OrganizationsPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-4">Organizações</h1>
-      {organizations && organizations.length > 0 ? (
+      {organizationRows.length > 0 ? (
         <ul className="space-y-2">
-          {organizations.map((org) => (
+          {organizationRows.map((org) => (
             <li key={org.id} className="p-4 border rounded">
               <h2 className="font-semibold">{org.name}</h2>
               <p className="text-sm text-gray-600">{org.email}</p>
