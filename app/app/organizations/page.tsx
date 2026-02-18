@@ -2,6 +2,8 @@ import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import type { Database } from '@/types/database';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Organizações page. Displays a list of organizations for the current
  * user. Organization users see only their organization; investors and

@@ -2,6 +2,8 @@ import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import type { Database } from '@/types/database';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Dashboard page. This page runs on the server and fetches the
  * authenticated user's session. Additional data such as the user's

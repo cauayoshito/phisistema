@@ -1,69 +1,31 @@
-'use client';
-
-import { ReactNode, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { ReactNode } from 'react';
+import { redirect } from 'next/navigation';
 import AppShell from '@/components/app/AppShell';
-import { supabase } from '@/lib/supabase/client';
+import { createClient } from '@/lib/supabase/server';
 
-const mockUser = {
-  name: 'Joao Silva',
-  role: 'Consultor',
-  org: 'Associacao Vida',
-};
-const isDevelopment = process.env.NODE_ENV === 'development';
+export const dynamic = 'force-dynamic';
 
-export default function AuthenticatedLayout({
+export default async function AuthenticatedLayout({
   children,
 }: {
   children: ReactNode;
 }) {
-  const router = useRouter();
-  const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const supabase = createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-  useEffect(() => {
-    let isMounted = true;
-
-    async function checkSession() {
-      if (isDevelopment) {
-        if (isMounted) {
-          setIsCheckingSession(false);
-        }
-        return;
-      }
-
-      if (!supabase) {
-        router.replace('/login');
-        return;
-      }
-
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
-        router.replace('/login');
-        return;
-      }
-
-      if (isMounted) {
-        setIsCheckingSession(false);
-      }
-    }
-
-    void checkSession();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [router]);
-
-  if (isCheckingSession) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-background-light text-slate-600">
-        Verificando sessao...
-      </main>
-    );
+  if (!session) {
+    redirect('/login');
   }
 
-  return <AppShell user={mockUser}>{children}</AppShell>;
+  const user = session.user;
+  const metadata = user.user_metadata;
+  const appUser = {
+    name: typeof metadata?.full_name === 'string' ? metadata.full_name : 'Usuario',
+    role: typeof metadata?.role === 'string' ? metadata.role : 'Consultor',
+    org: typeof metadata?.organization_name === 'string' ? metadata.organization_name : 'Organizacao',
+  };
+
+  return <AppShell user={appUser}>{children}</AppShell>;
 }

@@ -2,6 +2,8 @@ import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import type { Database } from '@/types/database';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Projects page. Lists projects visible to the current user. The
  * underlying RLS policies in Supabase determine which projects are

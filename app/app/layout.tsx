@@ -1,8 +1,11 @@
 import { ReactNode } from 'react';
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import type { Database } from '@/types/database';
+
+export const dynamic = 'force-dynamic';
 
 /**
  * Layout for the authenticated area of the application. It fetches
@@ -19,6 +22,9 @@ export default async function AppLayout({
   const {
     data: { session },
   } = await supabase.auth.getSession();
+  if (!session) {
+    redirect('/login');
+  }
 
   // Optionally the user's profile could be fetched here to show the
   // organisation name or role in the navigation bar. For now we
