@@ -1,48 +1,56 @@
-import { NextResponse, NextRequest } from 'next/server';
-import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
-import type { Database } from '@/types/database';
+// middleware.ts
+import { NextResponse, type NextRequest } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 
-/**
- * Global middleware to protect authenticated routes. Users who are not
- * signed in are redirected to the login page. Logged in users hitting
- * the login route are redirected to the dashboard. Role-based logic
- * could also be added here if required.
- */
-export async function middleware(req: NextRequest) {
-  const res = NextResponse.next();
-  const isDevelopment = process.env.NODE_ENV === 'development';
+export async function middleware(request: NextRequest) {
+  let response = NextResponse.next({ request });
 
-  if (isDevelopment) {
-    return res;
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            response.cookies.set(name, value, options);
+          });
+        },
+      },
+    }
+  );
+
+  const { data } = await supabase.auth.getSession();
+  const isLogged = !!data.session;
+
+  const pathname = request.nextUrl.pathname;
+
+  const isAuthPage = pathname.startsWith("/login");
+  const isProtected =
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/app") ||
+    pathname.startsWith("/projetos") ||
+    pathname.startsWith("/relatorios") ||
+    pathname.startsWith("/organizations");
+
+  if (isProtected && !isLogged) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
   }
 
-  const supabase = createMiddlewareClient<Database>({ req, res });
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  const pathname = req.nextUrl.pathname;
-  const isDashboardRoute = pathname === '/dashboard' || pathname.startsWith('/dashboard/');
-  const isLoginRoute = pathname === '/login';
-
-  // Protect only the dashboard area. Avoid intercepting Next internals/assets.
-  if (!session && isDashboardRoute) {
-    const redirectUrl = req.nextUrl.clone();
-    redirectUrl.pathname = '/login';
-    return NextResponse.redirect(redirectUrl);
+  // opcional: se já está logado, não deixa voltar pro /login
+  if (isAuthPage && isLogged) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard";
+    return NextResponse.redirect(url);
   }
 
-  // Logged in users should not stay on the login page.
-  if (session && isLoginRoute) {
-    const redirectUrl = req.nextUrl.clone();
-    redirectUrl.pathname = '/dashboard';
-    return NextResponse.redirect(redirectUrl);
-  }
-
-  return res;
+  return response;
 }
 
-// Apply middleware to all routes except for static assets and the Next.js internals
 export const config = {
-  matcher: ['/dashboard/:path*', '/login'],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
