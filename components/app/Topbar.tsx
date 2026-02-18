@@ -14,6 +14,7 @@ type UserInfo = {
 type TopbarProps = {
   user: UserInfo;
   onMenuClick: () => void;
+  onLogout: () => void;
 };
 
 type BreadcrumbItem = {
@@ -86,7 +87,7 @@ function buildBreadcrumbs(pathname: string): BreadcrumbItem[] {
   return [{ label: 'Home' }];
 }
 
-export default function Topbar({ user, onMenuClick }: TopbarProps) {
+export default function Topbar({ user, onMenuClick, onLogout }: TopbarProps) {
   const pathname = usePathname();
   const breadcrumbs = buildBreadcrumbs(pathname);
 
@@ -134,7 +135,12 @@ export default function Topbar({ user, onMenuClick }: TopbarProps) {
             {getInitials(user.name)}
           </div>
 
-          <button className="ml-1 text-slate-400 transition-colors hover:text-red-600" title="Sair" type="button">
+          <button
+            className="ml-1 text-slate-400 transition-colors hover:text-red-600"
+            title="Sair"
+            type="button"
+            onClick={onLogout}
+          >
             <LogOut className="size-5" />
           </button>
         </div>

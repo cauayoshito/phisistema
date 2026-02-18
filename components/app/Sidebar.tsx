@@ -24,6 +24,7 @@ type UserInfo = {
 type SidebarProps = {
   isOpen: boolean;
   onClose: () => void;
+  onLogout: () => void;
   user: UserInfo;
 };
 
@@ -114,7 +115,7 @@ function extractProjectId(pathname: string) {
   return projectId || null;
 }
 
-export default function Sidebar({ isOpen, onClose, user }: SidebarProps) {
+export default function Sidebar({ isOpen, onClose, onLogout, user }: SidebarProps) {
   const pathname = usePathname();
   const projectId = extractProjectId(pathname);
   const reportsHref = projectId ? `/projetos/${projectId}/relatorios` : '/projetos';
@@ -200,7 +201,12 @@ export default function Sidebar({ isOpen, onClose, user }: SidebarProps) {
               <p className="truncate text-sm font-medium text-white">{user.name}</p>
               <p className="truncate text-xs text-blue-200">{user.role}</p>
             </div>
-            <button type="button" title="Sair" className="ml-auto text-blue-100 transition-colors hover:text-white">
+            <button
+              type="button"
+              title="Sair"
+              className="ml-auto text-blue-100 transition-colors hover:text-white"
+              onClick={onLogout}
+            >
               <LogOut className="size-4" />
             </button>
           </div>
