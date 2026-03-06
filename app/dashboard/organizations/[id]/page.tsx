@@ -1,0 +1,506 @@
+import Link from "next/link";
+import Image from "next/image";
+import { createClient } from "@/lib/supabase/server";
+import {
+  getOrganizationByIdForUser,
+  getProfileById,
+  listOrganizationMembers,
+} from "@/services/organizations.service";
+import { getQuestionnaireByOrgId } from "@/services/organization_questionnaire.service";
+import { updateOrganizationAction } from "@/app/actions/organizations.actions";
+import { uploadOrganizationLogoAction } from "@/app/actions/organization-logo.actions";
+import { upsertOrganizationQuestionnaireAction } from "@/app/actions/organization-questionnaire.actions";
+
+export const dynamic = "force-dynamic";
+
+function msg(v?: string | string[]) {
+  return typeof v === "string" ? decodeURIComponent(v) : null;
+}
+
+function normalizeErrorMessage(v?: string | string[]) {
+  const value = msg(v);
+  if (!value) return null;
+  if (value === "NEXT_REDIRECT" || value.includes("NEXT_REDIRECT")) return null;
+  return value;
+}
+
+export default async function OrganizationDetailPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams?: { error?: string | string[]; success?: string | string[] };
+}) {
+  const orgId = params.id;
+
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return (
+      <div className="p-6">
+        <p>Sem sessão. Faça login.</p>
+        <Link className="underline" href="/login">
+          Ir para login
+        </Link>
+      </div>
+    );
+  }
+
+  const [org, q, members] = await Promise.all([
+    getOrganizationByIdForUser(orgId),
+    getQuestionnaireByOrgId(orgId),
+    listOrganizationMembers(orgId),
+  ]);
+
+  const updatedByProfile = org.updated_by
+    ? await getProfileById(org.updated_by).catch(() => null)
+    : null;
+
+  // Logo preview (signed url)
+  let logoUrl: string | null = null;
+  if (org.logo_path) {
+    try {
+      const { data, error } = await supabase.storage
+        .from("organization-logos")
+        .createSignedUrl(org.logo_path, 300);
+
+      if (!error) logoUrl = data?.signedUrl ?? null;
+    } catch {
+      logoUrl = null;
+    }
+  }
+
+  const error = normalizeErrorMessage(searchParams?.error);
+  const success = msg(searchParams?.success);
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Organização</h1>
+          {updatedByProfile && org.updated_at && (
+            <p className="text-sm text-slate-600">
+              Última Alteração:{" "}
+              {updatedByProfile.full_name ?? updatedByProfile.email ?? "—"} •{" "}
+              {new Date(org.updated_at).toLocaleDateString("pt-BR")}
+            </p>
+          )}
+        </div>
+
+        <Link
+          className="rounded-lg border px-3 py-2 text-sm hover:bg-slate-50"
+          href={`/dashboard/organizations/${orgId}/documents`}
+        >
+          Documentos da Organização →
+        </Link>
+      </div>
+
+      {error && (
+        <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800">
+          {success}
+        </div>
+      )}
+
+      {/* DADOS DA ORGANIZAÇÃO */}
+      <form
+        action={updateOrganizationAction}
+        className="rounded-xl border bg-white p-5 space-y-4"
+      >
+        <input type="hidden" name="orgId" value={orgId} />
+
+        <h2 className="text-lg font-semibold">Dados da Organização</h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <label className="text-sm">
+            Nome da Organização
+            <input
+              name="name"
+              defaultValue={org.name ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+
+          <label className="text-sm">
+            Responsável pela Organização
+            <select
+              name="responsible_user_id"
+              defaultValue={org.responsible_user_id ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            >
+              <option value="">—</option>
+              {members.map((m) => (
+                <option key={m.user_id} value={m.user_id}>
+                  {m.full_name ?? m.email ?? m.user_id} ({m.role})
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="grid grid-cols-3 gap-2">
+            <label className="text-sm col-span-1">
+              Tipo
+              <select
+                name="tax_id_type"
+                defaultValue={org.tax_id_type ?? "CNPJ"}
+                className="mt-1 w-full rounded-lg border px-3 py-2"
+              >
+                <option value="CNPJ">CNPJ</option>
+                <option value="CPF">CPF</option>
+              </select>
+            </label>
+
+            <label className="text-sm col-span-2">
+              CNPJ/CPF
+              <input
+                name="tax_id"
+                defaultValue={org.document ?? ""}
+                className="mt-1 w-full rounded-lg border px-3 py-2"
+              />
+            </label>
+          </div>
+
+          <label className="text-sm">
+            Razão Social
+            <input
+              name="legal_name"
+              defaultValue={org.legal_name ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+
+          <label className="text-sm">
+            Data da fundação
+            <input
+              name="foundation_date"
+              type="date"
+              defaultValue={org.foundation_date ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+
+          <label className="text-sm">
+            Perfil
+            <input
+              name="profile_type"
+              defaultValue={org.profile_type ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+
+          <label className="text-sm">
+            Outros: especifique
+            <input
+              name="profile_other"
+              defaultValue={org.profile_other ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+
+          <label className="text-sm">
+            E-mail
+            <input
+              name="email"
+              defaultValue={org.email ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+
+          <label className="text-sm">
+            Facebook
+            <input
+              name="facebook"
+              defaultValue={org.facebook ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+
+          <label className="text-sm">
+            Instagram
+            <input
+              name="instagram"
+              defaultValue={org.instagram ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+
+          <label className="text-sm">
+            Site
+            <input
+              name="site"
+              defaultValue={org.site ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+
+          <label className="text-sm">
+            LinkedIn
+            <input
+              name="linkedin"
+              defaultValue={org.linkedin ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+
+          <label className="text-sm">
+            Banco
+            <input
+              name="bank_name"
+              defaultValue={org.bank_name ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+
+          <label className="text-sm">
+            Agência
+            <input
+              name="bank_agency"
+              defaultValue={org.bank_agency ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+
+          <label className="text-sm">
+            Conta
+            <input
+              name="bank_account"
+              defaultValue={org.bank_account ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+
+          <label className="text-sm md:col-span-2">
+            PIX
+            <input
+              name="pix_key"
+              defaultValue={org.pix_key ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+        </div>
+
+        <button className="rounded-lg bg-blue-600 px-4 py-2 text-white font-semibold">
+          Salvar
+        </button>
+      </form>
+
+      {/* LOGO */}
+      <form
+        action={uploadOrganizationLogoAction}
+        className="rounded-xl border bg-white p-5 space-y-3"
+      >
+        <input type="hidden" name="orgId" value={orgId} />
+        <h2 className="text-lg font-semibold">Logo da Organização</h2>
+
+        {logoUrl ? (
+          <Image
+            src={logoUrl}
+            alt="Logo"
+            width={112}
+            height={112}
+            className="h-28 w-28 rounded-lg border object-contain bg-white"
+          />
+        ) : (
+          <div className="text-sm text-slate-600">Sem logo enviada.</div>
+        )}
+
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+          <input type="file" name="logo" accept="image/*" className="block" />
+          <button className="rounded-lg bg-slate-900 px-4 py-2 text-white font-semibold">
+            Enviar Logo
+          </button>
+        </div>
+      </form>
+
+      {/* QUESTIONÁRIO */}
+      <form
+        action={upsertOrganizationQuestionnaireAction}
+        className="rounded-xl border bg-white p-5 space-y-4"
+      >
+        <input type="hidden" name="orgId" value={orgId} />
+        <h2 className="text-lg font-semibold">Questionário</h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <label className="text-sm">
+            Liderança - Nome
+            <input
+              name="leader_name"
+              defaultValue={q?.leader_name ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+
+          <label className="text-sm">
+            Liderança - Celular
+            <input
+              name="leader_phone"
+              defaultValue={q?.leader_phone ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+
+          <label className="text-sm md:col-span-2">
+            Liderança - E-mail
+            <input
+              name="leader_email"
+              defaultValue={q?.leader_email ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+
+          <label className="text-sm">
+            Gênero
+            <input
+              name="leader_gender"
+              defaultValue={q?.leader_gender ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+              placeholder="Escolha um item"
+            />
+          </label>
+
+          <label className="text-sm">
+            Se outros, informar
+            <input
+              name="leader_gender_other"
+              defaultValue={q?.leader_gender_other ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+
+          <label className="text-sm md:col-span-2">
+            Cor/Raça (IBGE)
+            <input
+              name="leader_race"
+              defaultValue={q?.leader_race ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+              placeholder="Escolha um item"
+            />
+          </label>
+
+          <label className="text-sm">
+            Ocupa cargo público?
+            <input
+              name="legal_rep_has_public_office"
+              defaultValue={q?.legal_rep_has_public_office ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+              placeholder="Não / Sim / Não respondeu"
+            />
+          </label>
+
+          <label className="text-sm">
+            Caso tenha, cargo e ano
+            <input
+              name="legal_rep_public_office_details"
+              defaultValue={q?.legal_rep_public_office_details ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+
+          <label className="text-sm">
+            Se candidatou a cargo político?
+            <input
+              name="legal_rep_ran_for_political_office"
+              defaultValue={q?.legal_rep_ran_for_political_office ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+              placeholder="Não / Sim / Não respondeu"
+            />
+          </label>
+
+          <label className="text-sm">
+            Caso tenha, cargo e ano
+            <input
+              name="legal_rep_political_office_details"
+              defaultValue={q?.legal_rep_political_office_details ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+
+          <label className="text-sm md:col-span-2">
+            Declaração (inquérito/processo/condenação)
+            <input
+              name="legal_rep_criminal_declaration"
+              defaultValue={q?.legal_rep_criminal_declaration ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+              placeholder="Não / Sim / Não respondeu"
+            />
+          </label>
+
+          <div className="md:col-span-2 border-t pt-4">
+            <h3 className="font-semibold">Responsável pelo preenchimento</h3>
+          </div>
+
+          <label className="text-sm">
+            Nome
+            <input
+              name="filled_by_name"
+              defaultValue={q?.filled_by_name ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+
+          <label className="text-sm">
+            Celular
+            <input
+              name="filled_by_phone"
+              defaultValue={q?.filled_by_phone ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+
+          <label className="text-sm md:col-span-2">
+            E-mail
+            <input
+              name="filled_by_email"
+              defaultValue={q?.filled_by_email ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+
+          <div className="md:col-span-2 border-t pt-4">
+            <h3 className="font-semibold">Histórico de Editais/Curadorias</h3>
+          </div>
+
+          <label className="text-sm">
+            Data
+            <input
+              name="edital_date"
+              type="date"
+              defaultValue={q?.edital_date ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+
+          <label className="text-sm">
+            Código
+            <input
+              name="edital_code"
+              defaultValue={q?.edital_code ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+              placeholder="Escolha um item"
+            />
+          </label>
+
+          <label className="text-sm md:col-span-2">
+            Texto
+            <textarea
+              name="edital_text"
+              defaultValue={q?.edital_text ?? ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2 min-h-[120px]"
+            />
+          </label>
+        </div>
+
+        <button className="rounded-lg bg-blue-600 px-4 py-2 text-white font-semibold">
+          Salvar Questionário
+        </button>
+      </form>
+    </div>
+  );
+}

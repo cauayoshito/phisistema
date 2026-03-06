@@ -1,0 +1,58 @@
+import Link from "next/link";
+import { signUpAction } from "@/app/actions/auth.actions";
+
+export default function SignupPage({
+  searchParams,
+}: {
+  searchParams?: { error?: string };
+}) {
+  const error = searchParams?.error
+    ? decodeURIComponent(searchParams.error)
+    : null;
+
+  return (
+    <div className="flex min-h-screen items-center justify-center p-6">
+      <form
+        action={signUpAction}
+        className="w-full max-w-md rounded-xl border bg-white p-6"
+      >
+        <h1 className="text-xl font-bold">Criar cadastro</h1>
+        <p className="text-sm text-slate-600">
+          Crie sua conta para acessar o PHI
+        </p>
+
+        <label className="mt-6 block text-sm font-medium">Email</label>
+        <input
+          className="mt-2 w-full rounded-lg border px-3 py-2"
+          name="email"
+          type="email"
+          required
+        />
+
+        <label className="mt-4 block text-sm font-medium">Senha</label>
+        <input
+          className="mt-2 w-full rounded-lg border px-3 py-2"
+          name="password"
+          type="password"
+          minLength={6}
+          required
+        />
+
+        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+
+        <button
+          type="submit"
+          className="mt-6 w-full rounded-lg bg-blue-600 py-2 font-semibold text-white"
+        >
+          Criar cadastro
+        </button>
+
+        <div className="mt-4 text-sm">
+          <Link className="text-slate-600 hover:underline" href="/login">
+            Voltar para login
+          </Link>
+        </div>
+      </form>
+    </div>
+  );
+}
