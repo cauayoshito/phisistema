@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import {
   getOrganizationByIdForUser,
@@ -22,6 +21,35 @@ function normalizeErrorMessage(v?: string | string[]) {
   if (!value) return null;
   if (value === "NEXT_REDIRECT" || value.includes("NEXT_REDIRECT")) return null;
   return value;
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "—";
+
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+  }).format(d);
+}
+
+function shortId(value?: string | null) {
+  const s = String(value ?? "").trim();
+  if (!s) return "—";
+  if (s.length <= 16) return s;
+  return `${s.slice(0, 8)}...${s.slice(-4)}`;
+}
+
+function roleLabel(value?: string | null) {
+  const v = String(value ?? "")
+    .trim()
+    .toUpperCase();
+
+  if (v === "ORG_ADMIN") return "Administrador";
+  if (v === "ORG_MEMBER") return "Membro";
+
+  return "Vínculo ativo";
 }
 
 export default async function OrganizationDetailPage({
@@ -59,8 +87,8 @@ export default async function OrganizationDetailPage({
     ? await getProfileById(org.updated_by).catch(() => null)
     : null;
 
-  // Logo preview (signed url)
   let logoUrl: string | null = null;
+
   if (org.logo_path) {
     try {
       const { data, error } = await supabase.storage
@@ -77,263 +105,348 @@ export default async function OrganizationDetailPage({
   const success = msg(searchParams?.success);
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-start justify-between gap-4">
+    <main className="mx-auto max-w-6xl p-6 space-y-6">
+      <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Organização</h1>
+          <h1 className="text-2xl font-bold text-slate-900">
+            {org.name || "Organização"}
+          </h1>
+
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
+              ID {shortId(org.id)}
+            </span>
+
+            {org.document ? (
+              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
+                {org.tax_id_type ?? "Documento"}: {org.document}
+              </span>
+            ) : null}
+          </div>
+
           {updatedByProfile && org.updated_at && (
-            <p className="text-sm text-slate-600">
-              Última Alteração:{" "}
-              {updatedByProfile.full_name ?? updatedByProfile.email ?? "—"} •{" "}
-              {new Date(org.updated_at).toLocaleDateString("pt-BR")}
+            <p className="mt-3 text-sm text-slate-600">
+              Última alteração por{" "}
+              <span className="font-medium">
+                {updatedByProfile.full_name ??
+                  updatedByProfile.email ??
+                  "Usuário"}
+              </span>{" "}
+              em {formatDate(org.updated_at)}.
             </p>
           )}
         </div>
 
         <Link
-          className="rounded-lg border px-3 py-2 text-sm hover:bg-slate-50"
+          className="inline-flex items-center rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
           href={`/dashboard/organizations/${orgId}/documents`}
         >
-          Documentos da Organização →
+          Documentos da organização
         </Link>
-      </div>
+      </header>
 
       {error && (
         <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
           {error}
         </div>
       )}
+
       {success && (
         <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800">
           {success}
         </div>
       )}
 
-      {/* DADOS DA ORGANIZAÇÃO */}
-      <form
-        action={updateOrganizationAction}
-        className="rounded-xl border bg-white p-5 space-y-4"
-      >
-        <input type="hidden" name="orgId" value={orgId} />
+      <section className="grid gap-6 lg:grid-cols-[1.6fr_0.9fr]">
+        <form
+          action={updateOrganizationAction}
+          className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+        >
+          <input type="hidden" name="orgId" value={orgId} />
 
-        <h2 className="text-lg font-semibold">Dados da Organização</h2>
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">
+              Dados da organização
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Atualize informações institucionais e dados de contato.
+            </p>
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <label className="text-sm">
-            Nome da Organização
-            <input
-              name="name"
-              defaultValue={org.name ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
-            />
-          </label>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <label className="text-sm">
+              Nome da organização
+              <input
+                name="name"
+                defaultValue={org.name ?? ""}
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
+              />
+            </label>
 
-          <label className="text-sm">
-            Responsável pela Organização
-            <select
-              name="responsible_user_id"
-              defaultValue={org.responsible_user_id ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
-            >
-              <option value="">—</option>
-              {members.map((m) => (
-                <option key={m.user_id} value={m.user_id}>
-                  {m.full_name ?? m.email ?? m.user_id} ({m.role})
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <div className="grid grid-cols-3 gap-2">
-            <label className="text-sm col-span-1">
-              Tipo
+            <label className="text-sm">
+              Responsável pela organização
               <select
-                name="tax_id_type"
-                defaultValue={org.tax_id_type ?? "CNPJ"}
-                className="mt-1 w-full rounded-lg border px-3 py-2"
+                name="responsible_user_id"
+                defaultValue={org.responsible_user_id ?? ""}
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
               >
-                <option value="CNPJ">CNPJ</option>
-                <option value="CPF">CPF</option>
+                <option value="">—</option>
+                {members.map((m) => (
+                  <option key={m.user_id} value={m.user_id}>
+                    {m.full_name ?? m.email ?? shortId(m.user_id)} •{" "}
+                    {roleLabel(m.role)}
+                  </option>
+                ))}
               </select>
             </label>
 
-            <label className="text-sm col-span-2">
-              CNPJ/CPF
+            <div className="grid grid-cols-3 gap-2">
+              <label className="col-span-1 text-sm">
+                Tipo
+                <select
+                  name="tax_id_type"
+                  defaultValue={org.tax_id_type ?? "CNPJ"}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
+                >
+                  <option value="CNPJ">CNPJ</option>
+                  <option value="CPF">CPF</option>
+                </select>
+              </label>
+
+              <label className="col-span-2 text-sm">
+                CNPJ/CPF
+                <input
+                  name="tax_id"
+                  defaultValue={org.document ?? ""}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
+                />
+              </label>
+            </div>
+
+            <label className="text-sm">
+              Razão social
               <input
-                name="tax_id"
-                defaultValue={org.document ?? ""}
-                className="mt-1 w-full rounded-lg border px-3 py-2"
+                name="legal_name"
+                defaultValue={org.legal_name ?? ""}
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
+              />
+            </label>
+
+            <label className="text-sm">
+              Data de fundação
+              <input
+                name="foundation_date"
+                type="date"
+                defaultValue={org.foundation_date ?? ""}
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
+              />
+            </label>
+
+            <label className="text-sm">
+              Perfil
+              <input
+                name="profile_type"
+                defaultValue={org.profile_type ?? ""}
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
+              />
+            </label>
+
+            <label className="text-sm">
+              Outros: especifique
+              <input
+                name="profile_other"
+                defaultValue={org.profile_other ?? ""}
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
+              />
+            </label>
+
+            <label className="text-sm">
+              E-mail
+              <input
+                name="email"
+                defaultValue={org.email ?? ""}
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
+              />
+            </label>
+
+            <label className="text-sm">
+              Facebook
+              <input
+                name="facebook"
+                defaultValue={org.facebook ?? ""}
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
+              />
+            </label>
+
+            <label className="text-sm">
+              Instagram
+              <input
+                name="instagram"
+                defaultValue={org.instagram ?? ""}
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
+              />
+            </label>
+
+            <label className="text-sm">
+              Site
+              <input
+                name="site"
+                defaultValue={org.site ?? ""}
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
+              />
+            </label>
+
+            <label className="text-sm">
+              LinkedIn
+              <input
+                name="linkedin"
+                defaultValue={org.linkedin ?? ""}
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
+              />
+            </label>
+
+            <label className="text-sm">
+              Banco
+              <input
+                name="bank_name"
+                defaultValue={org.bank_name ?? ""}
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
+              />
+            </label>
+
+            <label className="text-sm">
+              Agência
+              <input
+                name="bank_agency"
+                defaultValue={org.bank_agency ?? ""}
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
+              />
+            </label>
+
+            <label className="text-sm">
+              Conta
+              <input
+                name="bank_account"
+                defaultValue={org.bank_account ?? ""}
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
+              />
+            </label>
+
+            <label className="text-sm md:col-span-2">
+              Chave PIX
+              <input
+                name="pix_key"
+                defaultValue={org.pix_key ?? ""}
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
               />
             </label>
           </div>
 
-          <label className="text-sm">
-            Razão Social
-            <input
-              name="legal_name"
-              defaultValue={org.legal_name ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
-            />
-          </label>
-
-          <label className="text-sm">
-            Data da fundação
-            <input
-              name="foundation_date"
-              type="date"
-              defaultValue={org.foundation_date ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
-            />
-          </label>
-
-          <label className="text-sm">
-            Perfil
-            <input
-              name="profile_type"
-              defaultValue={org.profile_type ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
-            />
-          </label>
-
-          <label className="text-sm">
-            Outros: especifique
-            <input
-              name="profile_other"
-              defaultValue={org.profile_other ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
-            />
-          </label>
-
-          <label className="text-sm">
-            E-mail
-            <input
-              name="email"
-              defaultValue={org.email ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
-            />
-          </label>
-
-          <label className="text-sm">
-            Facebook
-            <input
-              name="facebook"
-              defaultValue={org.facebook ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
-            />
-          </label>
-
-          <label className="text-sm">
-            Instagram
-            <input
-              name="instagram"
-              defaultValue={org.instagram ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
-            />
-          </label>
-
-          <label className="text-sm">
-            Site
-            <input
-              name="site"
-              defaultValue={org.site ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
-            />
-          </label>
-
-          <label className="text-sm">
-            LinkedIn
-            <input
-              name="linkedin"
-              defaultValue={org.linkedin ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
-            />
-          </label>
-
-          <label className="text-sm">
-            Banco
-            <input
-              name="bank_name"
-              defaultValue={org.bank_name ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
-            />
-          </label>
-
-          <label className="text-sm">
-            Agência
-            <input
-              name="bank_agency"
-              defaultValue={org.bank_agency ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
-            />
-          </label>
-
-          <label className="text-sm">
-            Conta
-            <input
-              name="bank_account"
-              defaultValue={org.bank_account ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
-            />
-          </label>
-
-          <label className="text-sm md:col-span-2">
-            PIX
-            <input
-              name="pix_key"
-              defaultValue={org.pix_key ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
-            />
-          </label>
-        </div>
-
-        <button className="rounded-lg bg-blue-600 px-4 py-2 text-white font-semibold">
-          Salvar
-        </button>
-      </form>
-
-      {/* LOGO */}
-      <form
-        action={uploadOrganizationLogoAction}
-        className="rounded-xl border bg-white p-5 space-y-3"
-      >
-        <input type="hidden" name="orgId" value={orgId} />
-        <h2 className="text-lg font-semibold">Logo da Organização</h2>
-
-        {logoUrl ? (
-          <Image
-            src={logoUrl}
-            alt="Logo"
-            width={112}
-            height={112}
-            className="h-28 w-28 rounded-lg border object-contain bg-white"
-          />
-        ) : (
-          <div className="text-sm text-slate-600">Sem logo enviada.</div>
-        )}
-
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-          <input type="file" name="logo" accept="image/*" className="block" />
-          <button className="rounded-lg bg-slate-900 px-4 py-2 text-white font-semibold">
-            Enviar Logo
+          <button className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">
+            Salvar dados
           </button>
-        </div>
-      </form>
+        </form>
 
-      {/* QUESTIONÁRIO */}
+        <div className="space-y-6">
+          <form
+            action={uploadOrganizationLogoAction}
+            className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+          >
+            <input type="hidden" name="orgId" value={orgId} />
+
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">
+                Logo da organização
+              </h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Envie uma imagem para representar a organização no sistema.
+              </p>
+            </div>
+
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt="Logo"
+                className="h-28 w-28 rounded-lg border border-slate-200 bg-white object-contain"
+              />
+            ) : (
+              <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-600">
+                Nenhuma logo enviada.
+              </div>
+            )}
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <input
+                type="file"
+                name="logo"
+                accept="image/*"
+                className="block text-sm"
+              />
+              <button className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90">
+                Enviar logo
+              </button>
+            </div>
+          </form>
+
+          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-900">
+              Membros vinculados
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Pessoas com acesso à organização.
+            </p>
+
+            <div className="mt-4 space-y-3">
+              {members.length === 0 ? (
+                <div className="text-sm text-slate-500">
+                  Nenhum membro encontrado.
+                </div>
+              ) : (
+                members.map((m) => (
+                  <div
+                    key={m.user_id}
+                    className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-3"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium text-slate-900">
+                        {m.full_name ?? "Usuário sem nome"}
+                      </div>
+                      <div className="truncate text-xs text-slate-500">
+                        {m.email ?? shortId(m.user_id)}
+                      </div>
+                    </div>
+
+                    <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
+                      {roleLabel(m.role)}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+        </div>
+      </section>
+
       <form
         action={upsertOrganizationQuestionnaireAction}
-        className="rounded-xl border bg-white p-5 space-y-4"
+        className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
       >
         <input type="hidden" name="orgId" value={orgId} />
-        <h2 className="text-lg font-semibold">Questionário</h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">Questionário</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Informações institucionais e dados complementares da organização.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <label className="text-sm">
             Liderança - Nome
             <input
               name="leader_name"
               defaultValue={q?.leader_name ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
             />
           </label>
 
@@ -342,7 +455,7 @@ export default async function OrganizationDetailPage({
             <input
               name="leader_phone"
               defaultValue={q?.leader_phone ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
             />
           </label>
 
@@ -351,7 +464,7 @@ export default async function OrganizationDetailPage({
             <input
               name="leader_email"
               defaultValue={q?.leader_email ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
             />
           </label>
 
@@ -360,8 +473,8 @@ export default async function OrganizationDetailPage({
             <input
               name="leader_gender"
               defaultValue={q?.leader_gender ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
-              placeholder="Escolha um item"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
+              placeholder="Ex: Feminino, Masculino, Não informar..."
             />
           </label>
 
@@ -370,7 +483,7 @@ export default async function OrganizationDetailPage({
             <input
               name="leader_gender_other"
               defaultValue={q?.leader_gender_other ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
             />
           </label>
 
@@ -379,8 +492,8 @@ export default async function OrganizationDetailPage({
             <input
               name="leader_race"
               defaultValue={q?.leader_race ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
-              placeholder="Escolha um item"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
+              placeholder="Informe conforme necessário"
             />
           </label>
 
@@ -389,7 +502,7 @@ export default async function OrganizationDetailPage({
             <input
               name="legal_rep_has_public_office"
               defaultValue={q?.legal_rep_has_public_office ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
               placeholder="Não / Sim / Não respondeu"
             />
           </label>
@@ -399,7 +512,7 @@ export default async function OrganizationDetailPage({
             <input
               name="legal_rep_public_office_details"
               defaultValue={q?.legal_rep_public_office_details ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
             />
           </label>
 
@@ -408,7 +521,7 @@ export default async function OrganizationDetailPage({
             <input
               name="legal_rep_ran_for_political_office"
               defaultValue={q?.legal_rep_ran_for_political_office ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
               placeholder="Não / Sim / Não respondeu"
             />
           </label>
@@ -418,7 +531,7 @@ export default async function OrganizationDetailPage({
             <input
               name="legal_rep_political_office_details"
               defaultValue={q?.legal_rep_political_office_details ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
             />
           </label>
 
@@ -427,13 +540,15 @@ export default async function OrganizationDetailPage({
             <input
               name="legal_rep_criminal_declaration"
               defaultValue={q?.legal_rep_criminal_declaration ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
               placeholder="Não / Sim / Não respondeu"
             />
           </label>
 
-          <div className="md:col-span-2 border-t pt-4">
-            <h3 className="font-semibold">Responsável pelo preenchimento</h3>
+          <div className="md:col-span-2 border-t border-slate-200 pt-4">
+            <h3 className="font-semibold text-slate-900">
+              Responsável pelo preenchimento
+            </h3>
           </div>
 
           <label className="text-sm">
@@ -441,7 +556,7 @@ export default async function OrganizationDetailPage({
             <input
               name="filled_by_name"
               defaultValue={q?.filled_by_name ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
             />
           </label>
 
@@ -450,7 +565,7 @@ export default async function OrganizationDetailPage({
             <input
               name="filled_by_phone"
               defaultValue={q?.filled_by_phone ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
             />
           </label>
 
@@ -459,12 +574,14 @@ export default async function OrganizationDetailPage({
             <input
               name="filled_by_email"
               defaultValue={q?.filled_by_email ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
             />
           </label>
 
-          <div className="md:col-span-2 border-t pt-4">
-            <h3 className="font-semibold">Histórico de Editais/Curadorias</h3>
+          <div className="md:col-span-2 border-t border-slate-200 pt-4">
+            <h3 className="font-semibold text-slate-900">
+              Histórico de editais/curadorias
+            </h3>
           </div>
 
           <label className="text-sm">
@@ -473,7 +590,7 @@ export default async function OrganizationDetailPage({
               name="edital_date"
               type="date"
               defaultValue={q?.edital_date ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
             />
           </label>
 
@@ -482,8 +599,8 @@ export default async function OrganizationDetailPage({
             <input
               name="edital_code"
               defaultValue={q?.edital_code ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
-              placeholder="Escolha um item"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5"
+              placeholder="Código ou referência"
             />
           </label>
 
@@ -492,15 +609,15 @@ export default async function OrganizationDetailPage({
             <textarea
               name="edital_text"
               defaultValue={q?.edital_text ?? ""}
-              className="mt-1 w-full rounded-lg border px-3 py-2 min-h-[120px]"
+              className="mt-1 min-h-[120px] w-full rounded-lg border border-slate-200 px-3 py-2.5"
             />
           </label>
         </div>
 
-        <button className="rounded-lg bg-blue-600 px-4 py-2 text-white font-semibold">
-          Salvar Questionário
+        <button className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">
+          Salvar questionário
         </button>
       </form>
-    </div>
+    </main>
   );
 }

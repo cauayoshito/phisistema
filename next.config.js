@@ -1,13 +1,28 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Enable the app router and server components; this is the default in Next.js 14.
   experimental: {
-    serverComponentsExternalPackages: ["@supabase/supabase-js", "@supabase/auth-helpers-nextjs"],
+    serverComponentsExternalPackages: [
+      "@supabase/supabase-js",
+      "@supabase/auth-helpers-nextjs",
+    ],
   },
   typescript: {
-    // Set to true to avoid build failures when first setting up the project.
     ignoreBuildErrors: true,
+  },
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "nbgbqujjjylbjhzafs.supabase.co",
+        pathname: "/storage/v1/object/sign/**",
+      },
+      {
+        protocol: "https",
+        hostname: "nbgbqujjjylbjhzafs.supabase.co",
+        pathname: "/storage/v1/object/public/**",
+      },
+    ],
   },
 };
 
