@@ -28,7 +28,7 @@ export async function POST(request: Request) {
       body = (await request.json()) as AcceptInviteBody;
     } catch (error) {
       return NextResponse.json(
-        { error: "Body JSON inválido.", details: error },
+        { error: "Não foi possível ler os dados do convite.", details: error },
         { status: 400 }
       );
     }
@@ -37,14 +37,14 @@ export async function POST(request: Request) {
 
     if (!token) {
       return NextResponse.json(
-        { error: "Campo obrigatório: token." },
+        { error: "Informe o token do convite." },
         { status: 400 }
       );
     }
 
     if (!isUuid(token)) {
       return NextResponse.json(
-        { error: "Token inválido (UUID esperado)." },
+        { error: "O token informado é inválido." },
         { status: 400 }
       );
     }
@@ -57,7 +57,10 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+      return NextResponse.json(
+        { error: "Faça login para aceitar este convite." },
+        { status: 401 }
+      );
     }
 
     const rpcResponse = await supabase.rpc(
@@ -79,26 +82,71 @@ export async function POST(request: Request) {
 
       if (lower.includes("not authenticated")) {
         return NextResponse.json(
-          { error: "Não autenticado.", details: message },
+          {
+            error: "Faça login para aceitar este convite.",
+            details: message,
+          },
           { status: 401 }
         );
       }
 
-      if (
-        lower.includes("invite email does not match") ||
-        lower.includes("invalid invite token") ||
-        lower.includes("invite expired") ||
-        lower.includes("invite already accepted") ||
-        lower.includes("token")
-      ) {
+      if (lower.includes("user email not found")) {
         return NextResponse.json(
-          { error: "Convite inválido.", details: message },
+          {
+            error:
+              "Não foi possível identificar o e-mail da sua conta. Entre novamente e tente de novo.",
+            details: message,
+          },
+          { status: 400 }
+        );
+      }
+
+      if (lower.includes("invite email does not match logged user")) {
+        return NextResponse.json(
+          {
+            error:
+              "Este convite foi enviado para outro e-mail. Entre com a conta correta para continuar.",
+            details: message,
+          },
+          { status: 400 }
+        );
+      }
+
+      if (lower.includes("invalid invite token")) {
+        return NextResponse.json(
+          {
+            error: "O link de convite é inválido ou foi alterado.",
+            details: message,
+          },
+          { status: 400 }
+        );
+      }
+
+      if (lower.includes("invite expired")) {
+        return NextResponse.json(
+          {
+            error: "Este convite expirou. Peça um novo link de acesso.",
+            details: message,
+          },
+          { status: 400 }
+        );
+      }
+
+      if (lower.includes("invite already accepted")) {
+        return NextResponse.json(
+          {
+            error: "Este convite já foi utilizado.",
+            details: message,
+          },
           { status: 400 }
         );
       }
 
       return NextResponse.json(
-        { error: "Falha ao aceitar convite.", details: message },
+        {
+          error: "Não foi possível aceitar o convite agora.",
+          details: message,
+        },
         { status: 500 }
       );
     }
@@ -107,7 +155,10 @@ export async function POST(request: Request) {
 
     if (!payload) {
       return NextResponse.json(
-        { error: "RPC accept_org_invite retornou vazio." },
+        {
+          error:
+            "O convite foi processado, mas não retornou os dados esperados.",
+        },
         { status: 500 }
       );
     }
@@ -125,7 +176,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        error: "Erro interno ao aceitar convite.",
+        error: "Ocorreu um erro interno ao aceitar o convite.",
         details:
           error instanceof Error
             ? { message: error.message, stack: error.stack }
