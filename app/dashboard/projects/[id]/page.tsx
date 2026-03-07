@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { changeProjectStatusAction } from "@/app/actions/project-status.actions";
-import { createReportAction } from "@/app/actions/report.actions";
 
 import { isConsultant } from "@/lib/permissions";
 import { PROJECT_STATUS_LABEL, type ProjectStatus } from "@/lib/status";
@@ -56,18 +55,30 @@ export default async function DashboardProjectDetailPage({
   params,
   searchParams,
 }: Props) {
-  const user = await requireUser();
+  const user = (await requireUser()) as any;
+  const safeUserId = user?.id ?? user?.user?.id;
 
-  const [ctx, project] = await Promise.all([
-    getUserContext(user.id),
-    getProjectByIdForUser(params.id, user.id),
+  if (!safeUserId) {
+    notFound();
+  }
+
+  const [ctx, rawProject] = await Promise.all([
+    getUserContext(safeUserId),
+    getProjectByIdForUser(params.id, safeUserId),
   ]);
 
-  if (!project) notFound();
+  if (!rawProject) notFound();
 
-  const reports = await listReportsByProject(project.id, user.id);
+  const project = rawProject as any;
+  const reports = await listReportsByProject(project.id, safeUserId);
 
   const status = toProjectStatus(project.status);
+
+  const projectTitle =
+    project.title ?? project.name ?? project.project_name ?? "Projeto";
+
+  const projectType =
+    project.project_type ?? project.type ?? project.projectType ?? "-";
 
   const isOrgUser = ctx.roles.includes("ORG");
   const consultant = isConsultant(ctx);
@@ -84,13 +95,11 @@ export default async function DashboardProjectDetailPage({
 
   return (
     <main className="mx-auto max-w-6xl p-6 space-y-6">
-      {/* HEADER */}
-
       <header className="flex items-start justify-between">
         <div className="space-y-1">
-          <h1 className="text-2xl font-bold">{project.title}</h1>
+          <h1 className="text-2xl font-bold">{projectTitle}</h1>
 
-          <p className="text-sm text-slate-600">Tipo: {project.project_type}</p>
+          <p className="text-sm text-slate-600">Tipo: {projectType}</p>
 
           <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-medium">
             {PROJECT_STATUS_LABEL[status]}
@@ -105,8 +114,6 @@ export default async function DashboardProjectDetailPage({
         </Link>
       </header>
 
-      {/* ALERTAS */}
-
       {errorMessage && (
         <div className="rounded border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
           {errorMessage}
@@ -115,11 +122,9 @@ export default async function DashboardProjectDetailPage({
 
       {success && (
         <div className="rounded border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
-          Status atualizado com sucesso.
+          {success}
         </div>
       )}
-
-      {/* WORKFLOW */}
 
       <section className="rounded-xl border bg-white p-4 space-y-3">
         <h2 className="font-semibold">Fluxo de status</h2>
@@ -187,11 +192,9 @@ export default async function DashboardProjectDetailPage({
         )}
       </section>
 
-      {/* TABS */}
-
       <nav className="flex gap-4 border-b pb-2 text-sm">
         <Link
-          href={`?tab=overview`}
+          href="?tab=overview"
           className={
             tab === "overview" ? "font-semibold text-black" : "text-slate-500"
           }
@@ -200,7 +203,7 @@ export default async function DashboardProjectDetailPage({
         </Link>
 
         <Link
-          href={`?tab=plan`}
+          href="?tab=plan"
           className={
             tab === "plan" ? "font-semibold text-black" : "text-slate-500"
           }
@@ -209,7 +212,7 @@ export default async function DashboardProjectDetailPage({
         </Link>
 
         <Link
-          href={`?tab=financial`}
+          href="?tab=financial"
           className={
             tab === "financial" ? "font-semibold text-black" : "text-slate-500"
           }
@@ -218,7 +221,7 @@ export default async function DashboardProjectDetailPage({
         </Link>
 
         <Link
-          href={`?tab=documents`}
+          href="?tab=documents"
           className={
             tab === "documents" ? "font-semibold text-black" : "text-slate-500"
           }
@@ -227,7 +230,7 @@ export default async function DashboardProjectDetailPage({
         </Link>
 
         <Link
-          href={`?tab=reports`}
+          href="?tab=reports"
           className={
             tab === "reports" ? "font-semibold text-black" : "text-slate-500"
           }
@@ -235,8 +238,6 @@ export default async function DashboardProjectDetailPage({
           Relatórios
         </Link>
       </nav>
-
-      {/* TAB CONTENT */}
 
       {tab === "overview" && <ProjectOverview project={project} />}
 
@@ -248,9 +249,8 @@ export default async function DashboardProjectDetailPage({
 
       {tab === "reports" && (
         <ProjectReports
-          project={project}
-          reports={reports}
-          createReportAction={createReportAction}
+          projectId={String(project.id)}
+          reports={reports as any[]}
         />
       )}
     </main>

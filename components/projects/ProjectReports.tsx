@@ -1,64 +1,155 @@
-// components/projects/ProjectReports.tsx
-
 import Link from "next/link";
-
-type ReportLike = {
-  id: string;
-  status: string;
-  period_start: string;
-  period_end: string;
-};
+import { createReportAction } from "@/app/actions/report.actions";
+import { REPORT_STATUS_LABEL, type ReportStatus } from "@/lib/status";
 
 type Props = {
   projectId: string;
-  reports: ReportLike[];
-  createReportAction: (formData: FormData) => Promise<void>;
+  reports: any[];
 };
 
-export default function ProjectReports({
-  projectId,
-  reports,
-  createReportAction,
-}: Props) {
+function formatDate(iso: string | null | undefined) {
+  if (!iso) return "-";
+  return String(iso).slice(0, 10);
+}
+
+function fallbackTitle(
+  title: string | null | undefined,
+  start: string | null | undefined,
+  end: string | null | undefined
+) {
+  if (title && title.trim()) return title;
+  return `Relatório ${formatDate(start)} → ${formatDate(end)}`;
+}
+
+function getCurrentMonthRange() {
+  const now = new Date();
+
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+  const toInputDate = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  return {
+    start: toInputDate(start),
+    end: toInputDate(end),
+  };
+}
+
+export default function ProjectReports({ projectId, reports }: Props) {
+  const defaults = getCurrentMonthRange();
+
   return (
-    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-base font-semibold text-slate-900">Relatórios</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Prestação de contas por período.
-          </p>
+    <section className="space-y-4">
+      <div className="rounded-xl border bg-white p-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold">Relatórios</h2>
+          <Link
+            href="/dashboard/reports"
+            className="text-sm text-blue-600 hover:underline"
+          >
+            Ver todos
+          </Link>
         </div>
 
-        <form action={createReportAction} className="shrink-0">
+        <form
+          action={createReportAction}
+          className="mt-3 grid gap-3 sm:grid-cols-6"
+        >
           <input type="hidden" name="project_id" value={projectId} />
-          <button className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
-            Criar relatório
+
+          <div className="sm:col-span-3">
+            <label className="mb-1 block text-xs text-slate-600">
+              Título (opcional)
+            </label>
+            <input
+              name="title"
+              placeholder="Ex: Relatório Mensal"
+              className="w-full rounded border px-3 py-2"
+            />
+          </div>
+
+          <div className="sm:col-span-1">
+            <label className="mb-1 block text-xs text-slate-600">Tipo</label>
+            <select
+              name="period_type"
+              className="w-full rounded border px-3 py-2"
+              defaultValue="MONTHLY"
+            >
+              <option value="MONTHLY">Mensal</option>
+            </select>
+          </div>
+
+          <div className="sm:col-span-1">
+            <label className="mb-1 block text-xs text-slate-600">Início</label>
+            <input
+              name="period_start"
+              type="date"
+              className="w-full rounded border px-3 py-2"
+              defaultValue={defaults.start}
+              required
+            />
+          </div>
+
+          <div className="sm:col-span-1">
+            <label className="mb-1 block text-xs text-slate-600">Fim</label>
+            <input
+              name="period_end"
+              type="date"
+              className="w-full rounded border px-3 py-2"
+              defaultValue={defaults.end}
+              required
+            />
+          </div>
+
+          <button
+            className="rounded bg-blue-600 px-4 py-2 text-white sm:col-span-6"
+            type="submit"
+          >
+            Criar relatório para este projeto
           </button>
         </form>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[760px] text-left text-sm">
-          <thead className="border-b border-slate-200 bg-white text-xs font-semibold uppercase tracking-wide text-slate-500">
+      <section className="overflow-hidden rounded-xl border bg-white">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-slate-50">
             <tr>
+              <th className="px-4 py-3">Título</th>
               <th className="px-4 py-3">Período</th>
               <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3 text-right">Ações</th>
+              <th className="px-4 py-3">Criado em</th>
+              <th className="px-4 py-3">Ações</th>
             </tr>
           </thead>
-
-          <tbody className="divide-y divide-slate-200">
-            {reports.map((r) => (
-              <tr key={r.id} className="hover:bg-slate-50">
-                <td className="px-4 py-3 text-slate-900">
-                  {r.period_start} - {r.period_end}
+          <tbody>
+            {reports.map((r: any) => (
+              <tr key={r.id} className="border-t">
+                <td className="px-4 py-3">
+                  {fallbackTitle(r.title, r.period_start, r.period_end)}
                 </td>
-                <td className="px-4 py-3 text-slate-700">{r.status}</td>
-                <td className="px-4 py-3 text-right">
+
+                <td className="px-4 py-3">
+                  {formatDate(r.period_start)} → {formatDate(r.period_end)}
+                </td>
+
+                <td className="px-4 py-3">
+                  {REPORT_STATUS_LABEL[r.status as ReportStatus] ??
+                    String(r.status ?? "-")}
+                </td>
+
+                <td className="px-4 py-3">
+                  {String(r.created_at ?? "").slice(0, 19) || "-"}
+                </td>
+
+                <td className="px-4 py-3">
                   <Link
                     href={`/dashboard/reports/${r.id}`}
-                    className="text-sm font-medium text-blue-600 hover:underline"
+                    className="text-blue-600 hover:underline"
                   >
                     Abrir
                   </Link>
@@ -68,14 +159,14 @@ export default function ProjectReports({
 
             {reports.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-4 py-6 text-slate-500">
-                  Nenhum relatório criado.
+                <td colSpan={5} className="px-4 py-4 text-slate-500">
+                  Nenhum relatório ainda. Crie o primeiro acima.
                 </td>
               </tr>
             )}
           </tbody>
         </table>
-      </div>
+      </section>
     </section>
   );
 }

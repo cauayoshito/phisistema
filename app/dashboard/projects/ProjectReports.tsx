@@ -1,11 +1,10 @@
 import Link from "next/link";
 import { createReportAction } from "@/app/actions/report.actions";
-import { listReportsByProject } from "@/services/reports.service";
 import { REPORT_STATUS_LABEL, type ReportStatus } from "@/lib/status";
 
 type Props = {
   projectId: string;
-  userId: string;
+  reports: any[];
 };
 
 function formatDate(iso: string | null | undefined) {
@@ -13,13 +12,36 @@ function formatDate(iso: string | null | undefined) {
   return String(iso).slice(0, 10);
 }
 
-function fallbackTitle(title: string | null, start: string, end: string) {
+function fallbackTitle(
+  title: string | null | undefined,
+  start: string | null | undefined,
+  end: string | null | undefined
+) {
   if (title && title.trim()) return title;
   return `Relatório ${formatDate(start)} → ${formatDate(end)}`;
 }
 
-export default async function ProjectReports({ projectId, userId }: Props) {
-  const reports = await listReportsByProject(projectId, userId);
+function getCurrentMonthRange() {
+  const now = new Date();
+
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+  const toInputDate = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  return {
+    start: toInputDate(start),
+    end: toInputDate(end),
+  };
+}
+
+export default function ProjectReports({ projectId, reports }: Props) {
+  const defaults = getCurrentMonthRange();
 
   return (
     <section className="space-y-4">
@@ -38,7 +60,6 @@ export default async function ProjectReports({ projectId, userId }: Props) {
           action={createReportAction}
           className="mt-3 grid gap-3 sm:grid-cols-6"
         >
-          {/* project fixo */}
           <input type="hidden" name="project_id" value={projectId} />
 
           <div className="sm:col-span-3">
@@ -69,6 +90,8 @@ export default async function ProjectReports({ projectId, userId }: Props) {
               name="period_start"
               type="date"
               className="w-full rounded border px-3 py-2"
+              defaultValue={defaults.start}
+              required
             />
           </div>
 
@@ -78,6 +101,8 @@ export default async function ProjectReports({ projectId, userId }: Props) {
               name="period_end"
               type="date"
               className="w-full rounded border px-3 py-2"
+              defaultValue={defaults.end}
+              required
             />
           </div>
 
@@ -102,26 +127,25 @@ export default async function ProjectReports({ projectId, userId }: Props) {
             </tr>
           </thead>
           <tbody>
-            {reports.map((r) => (
+            {reports.map((r: any) => (
               <tr key={r.id} className="border-t">
                 <td className="px-4 py-3">
-                  {fallbackTitle(
-                    r.title ?? null,
-                    String(r.period_start),
-                    String(r.period_end)
-                  )}
+                  {fallbackTitle(r.title, r.period_start, r.period_end)}
                 </td>
+
                 <td className="px-4 py-3">
-                  {formatDate(String(r.period_start))} →{" "}
-                  {formatDate(String(r.period_end))}
+                  {formatDate(r.period_start)} → {formatDate(r.period_end)}
                 </td>
+
                 <td className="px-4 py-3">
                   {REPORT_STATUS_LABEL[r.status as ReportStatus] ??
-                    String(r.status)}
+                    String(r.status ?? "-")}
                 </td>
+
                 <td className="px-4 py-3">
-                  {String(r.created_at).slice(0, 19)}
+                  {String(r.created_at ?? "").slice(0, 19) || "-"}
                 </td>
+
                 <td className="px-4 py-3">
                   <Link
                     href={`/dashboard/reports/${r.id}`}
