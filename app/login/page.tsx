@@ -1,5 +1,6 @@
-"use client";
+﻿"use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -30,7 +31,6 @@ export default function LoginPage() {
       return;
     }
 
-    // seu dashboard está dentro do (app):
     router.replace("/dashboard");
     router.refresh();
   }
@@ -41,8 +41,22 @@ export default function LoginPage() {
         onSubmit={onSubmit}
         className="w-full max-w-md rounded-xl border bg-white p-6"
       >
-        <h1 className="text-xl font-bold">PHI - Sistema</h1>
-        <p className="text-sm text-slate-600">Entre para acessar sua conta</p>
+        <div className="flex items-center gap-3">
+          <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white p-1">
+            <Image
+              src="/branding/TransparenciaSocial.png"
+              alt="Logo Transparência Social"
+              fill
+              sizes="48px"
+              className="object-contain"
+              priority
+            />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold">Transparência Social</h1>
+            <p className="text-sm text-slate-600">Entre para acessar sua conta</p>
+          </div>
+        </div>
 
         <label className="mt-6 block text-sm font-medium">Email</label>
         <input

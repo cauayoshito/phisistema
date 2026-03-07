@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -145,7 +145,7 @@ export default function HelpPage() {
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="max-w-3xl">
           <h2 className="text-xl font-semibold text-slate-900">
-            Use o PHI com mais clareza e menos retrabalho
+            Use a Transparência Social com mais clareza e menos retrabalho
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
             Esta página reúne os principais fluxos do sistema para facilitar o
@@ -182,8 +182,8 @@ export default function HelpPage() {
           Primeiros passos
         </h2>
         <p className="mt-1 text-sm text-slate-600">
-          Esta é a ordem mais recomendada para operar o PHI com segurança e
-          fluidez.
+          Esta é a ordem mais recomendada para operar a Transparência Social com
+          segurança e fluidez.
         </p>
 
         <div className="mt-5 grid gap-4 md:grid-cols-2">
@@ -251,7 +251,8 @@ export default function HelpPage() {
           Fluxos do sistema
         </h2>
         <p className="mt-1 text-sm text-slate-600">
-          Entenda o caminho natural de projetos e relatórios dentro do PHI.
+          Entenda o caminho natural de projetos e relatórios dentro da
+          Transparência Social.
         </p>
 
         <div className="mt-5 grid gap-6 lg:grid-cols-2">

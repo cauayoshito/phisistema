@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+﻿import type { ReactNode } from "react";
 import Sidebar from "@/components/dashboard/Sidebar";
 import Topbar from "@/components/dashboard/Topbar";
 import { signOutAction } from "@/app/actions/auth.actions";
@@ -14,7 +14,7 @@ export default function DashboardLayout({ children }: Props) {
         footer={
           <div className="rounded-lg border border-white/10 bg-white/5 p-3">
             <div className="text-white font-semibold text-sm truncate">
-              PHI Admin
+              Transparência Social
             </div>
             <div className="text-slate-400 text-xs truncate">
               Ambiente autenticado
@@ -30,7 +30,7 @@ export default function DashboardLayout({ children }: Props) {
             </form>
 
             <div className="mt-3 text-[10px] text-slate-500">
-              © {new Date().getFullYear()} PHI Systems
+              © {new Date().getFullYear()} Transparência Social
             </div>
           </div>
         }

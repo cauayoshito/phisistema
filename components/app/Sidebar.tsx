@@ -1,6 +1,7 @@
-'use client';
+﻿'use client';
 
 import { usePathname } from 'next/navigation';
+import Image from 'next/image';
 import Link from 'next/link';
 import {
   BarChart3,
@@ -12,7 +13,6 @@ import {
   FolderOpen,
   Settings,
   ShieldCheck,
-  Sprout,
   X,
 } from 'lucide-react';
 
@@ -138,12 +138,18 @@ export default function Sidebar({ isOpen, onClose, onLogout, user }: SidebarProp
       >
         <div className="flex h-16 items-center justify-between border-b border-white/10 px-6 lg:justify-start">
           <div className="flex items-center gap-3">
-            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/90 shadow-lg shadow-blue-900/50">
-              <Sprout className="size-5 text-white" />
+            <div className="relative size-9 overflow-hidden rounded-lg border border-white/20 bg-white p-1">
+              <Image
+                src="/branding/TransparenciaSocial.png"
+                alt="Logo Transparência Social"
+                fill
+                sizes="36px"
+                className="object-contain"
+              />
             </div>
-            <div className="flex flex-col">
-              <h1 className="text-base font-bold leading-tight tracking-wide text-white">PHI System</h1>
-              <p className="text-xs font-normal text-blue-200">Gestao Social</p>
+            <div className="flex min-w-0 flex-col">
+              <h1 className="truncate text-base font-bold leading-tight tracking-wide text-white">Transparência Social</h1>
+              <p className="text-xs font-normal text-blue-200">Gestão Social</p>
             </div>
           </div>
           <button type="button" className="text-blue-100 lg:hidden" onClick={onClose}>

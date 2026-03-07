@@ -1,5 +1,4 @@
-// app/debug-auth/page.tsx
-import { redirect } from "next/navigation";
+﻿import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getUserContext } from "@/services/membership.service";
 
@@ -60,7 +59,7 @@ export default async function DebugAuthPage() {
       <header className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">
-            Debug Auth (PHI)
+            Debug Auth (Transparência Social)
           </h1>
           <p className="mt-1 text-sm text-slate-600">
             Tela de diagnóstico para bater{" "}

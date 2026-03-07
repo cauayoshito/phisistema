@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { signUpAction } from "@/app/actions/auth.actions";
 
 export default function SignupPage({
@@ -18,7 +18,7 @@ export default function SignupPage({
       >
         <h1 className="text-xl font-bold">Criar cadastro</h1>
         <p className="text-sm text-slate-600">
-          Crie sua conta para acessar o PHI
+          Crie sua conta para acessar a Transparência Social
         </p>
 
         <label className="mt-6 block text-sm font-medium">Email</label>
@@ -56,3 +56,4 @@ export default function SignupPage({
     </div>
   );
 }
+

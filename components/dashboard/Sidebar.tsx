@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+﻿import type { ReactNode } from "react";
+import Image from "next/image";
 import NavLink from "./NavLink";
 
 type Props = {
@@ -10,15 +11,22 @@ export default function Sidebar({ footer }: Props) {
     <aside className="w-64 bg-[#0f172a] text-slate-300 flex flex-col h-full flex-shrink-0">
       {/* Brand */}
       <div className="p-6 flex items-center gap-3 border-b border-slate-700/50">
-        <div className="bg-gradient-to-tr from-blue-600 to-blue-400 aspect-square rounded-lg w-10 h-10 grid place-items-center shadow-lg text-white font-bold text-xl">
-          P
+        <div className="relative w-10 h-10 rounded-lg bg-white/95 p-1 shadow-lg overflow-hidden">
+          <Image
+            src="/branding/TransparenciaSocial.png"
+            alt="Logo Transparência Social"
+            fill
+            sizes="40px"
+            className="object-contain"
+            priority
+          />
         </div>
         <div className="min-w-0">
           <h1 className="text-white text-lg font-bold leading-tight tracking-wide">
-            PHI
+            Transparência Social
           </h1>
           <p className="text-slate-400 text-xs font-medium truncate">
-            Administração Filantrópica
+            Administração institucional
           </p>
         </div>
       </div>

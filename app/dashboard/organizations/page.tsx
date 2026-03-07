@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { requireUser } from "@/services/auth.service";
 import { getOrganizationMemberships } from "@/services/membership.service";
 import { listOrganizationsForUser } from "@/services/organizations.service";
@@ -85,7 +85,8 @@ export default async function DashboardOrganizationsPage({
               Você ainda não tem organização
             </h2>
             <p className="text-sm text-slate-600">
-              Para continuar no PHI, crie uma organização ou entre por convite.
+              Para continuar na Transparência Social, crie uma organização ou
+              entre por convite.
             </p>
           </div>
 
