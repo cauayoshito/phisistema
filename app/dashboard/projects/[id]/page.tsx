@@ -7,15 +7,23 @@ import { isConsultant } from "@/lib/permissions";
 import { PROJECT_STATUS_LABEL, type ProjectStatus } from "@/lib/status";
 
 import { requireUser } from "@/services/auth.service";
-import { getUserContext } from "@/services/membership.service";
-import { getProjectByIdForUser } from "@/services/projects.service";
+import {
+  getUserContext,
+  getOrganizationMemberships,
+} from "@/services/membership.service";
+import {
+  getProjectByIdForUser,
+  listProjectParticipants,
+} from "@/services/projects.service";
 import { listReportsByProject } from "@/services/reports.service";
+import { listOrganizationMembers } from "@/services/organizations.service";
 
 import ProjectOverview from "@/components/projects/ProjectOverview";
 import ProjectPlan from "@/components/projects/ProjectPlan";
 import ProjectFinancial from "@/components/projects/ProjectFinancial";
 import ProjectDocuments from "@/components/projects/ProjectDocuments";
 import ProjectReports from "@/components/projects/ProjectReports";
+import ProjectParticipants from "@/components/projects/ProjectParticipants";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +59,12 @@ function readQueryValue(value: string | string[] | undefined): string | null {
   return null;
 }
 
+function normalizeRole(value: unknown) {
+  return String(value ?? "")
+    .trim()
+    .toUpperCase();
+}
+
 export default async function DashboardProjectDetailPage({
   params,
   searchParams,
@@ -69,16 +83,29 @@ export default async function DashboardProjectDetailPage({
 
   if (!rawProject) notFound();
 
-  const project = rawProject as any;
-  const reports = await listReportsByProject(project.id, safeUserId);
+  const project = rawProject;
+
+  const [reports, organizationMembers, participants, orgMemberships] =
+    await Promise.all([
+      listReportsByProject(project.id, safeUserId),
+      listOrganizationMembers(project.organization_id),
+      listProjectParticipants(project.id),
+      getOrganizationMemberships(safeUserId),
+    ]);
 
   const status = toProjectStatus(project.status);
 
   const projectTitle =
-    project.title ?? project.name ?? project.project_name ?? "Projeto";
+    (project as any).title ??
+    (project as any).name ??
+    (project as any).project_name ??
+    "Projeto";
 
   const projectType =
-    project.project_type ?? project.type ?? project.projectType ?? "-";
+    (project as any).project_type ??
+    (project as any).type ??
+    (project as any).projectType ??
+    "-";
 
   const isOrgUser = ctx.roles.includes("ORG");
   const consultant = isConsultant(ctx);
@@ -87,6 +114,20 @@ export default async function DashboardProjectDetailPage({
   const canResubmit = status === "DEVOLVIDO" && isOrgUser;
   const canSubmit = status === "DRAFT" && isOrgUser;
   const canReview = status === "EM_ANALISE" && consultant;
+
+  const currentParticipant = participants.find(
+    (participant) => participant.user_id === safeUserId
+  );
+
+  const isProjectOwner = normalizeRole(currentParticipant?.role) === "OWNER";
+
+  const currentOrgMembership = orgMemberships.find(
+    (membership) => membership.organization_id === project.organization_id
+  );
+
+  const isOrgAdmin = normalizeRole(currentOrgMembership?.role) === "ORG_ADMIN";
+
+  const canManageParticipants = isProjectOwner || isOrgAdmin;
 
   const errorMessage = readQueryValue(searchParams?.error);
   const success = readQueryValue(searchParams?.success);
@@ -239,13 +280,29 @@ export default async function DashboardProjectDetailPage({
         </Link>
       </nav>
 
-      {tab === "overview" && <ProjectOverview project={project} />}
+      {tab === "overview" && (
+        <div className="space-y-6">
+          <ProjectOverview project={project as any} />
 
-      {tab === "plan" && <ProjectPlan project={project} />}
+          <ProjectParticipants
+            projectId={String(project.id)}
+            canManage={canManageParticipants}
+            organizationMembers={organizationMembers as any[]}
+            participants={participants as any[]}
+          />
+        </div>
+      )}
 
-      {tab === "financial" && <ProjectFinancial project={project} />}
+      {tab === "plan" && <ProjectPlan project={project as any} />}
 
-      {tab === "documents" && <ProjectDocuments project={project} />}
+      {tab === "financial" && <ProjectFinancial project={project as any} />}
+
+      {tab === "documents" && (
+        <ProjectDocuments
+          projectId={String(project.id)}
+          projectType={String(projectType)}
+        />
+      )}
 
       {tab === "reports" && (
         <ProjectReports

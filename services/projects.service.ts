@@ -1,9 +1,23 @@
-// services/projects.service.ts
 import { createClient } from "@/lib/supabase/server";
 import { getOrganizationMemberships } from "@/services/membership.service";
 import type { Database, Json } from "@/types/database";
 
 type ProjectRow = Database["public"]["Tables"]["projects"]["Row"];
+
+type ProjectMembershipInsert = {
+  project_id: string;
+  user_id: string;
+  role: "OWNER" | "CONSULTANT" | "INVESTOR" | "VIEWER";
+  created_by?: string | null;
+};
+
+export type ProjectParticipantRow = {
+  user_id: string;
+  role: "OWNER" | "CONSULTANT" | "INVESTOR" | "VIEWER";
+  created_at?: string | null;
+  full_name: string | null;
+  email: string | null;
+};
 
 export type CreateProjectInput = {
   title: string;
@@ -18,7 +32,6 @@ function normalizeRole(role: string | null | undefined): string {
   return (role ?? "").trim().toUpperCase();
 }
 
-// CHANGE: melhorar extração de erro do PostgrestError
 function serviceError(base: string, raw: unknown, context: string) {
   const anyRaw = raw as any;
   const msg =
@@ -33,37 +46,72 @@ function serviceError(base: string, raw: unknown, context: string) {
   return new Error(`${base} [context: ${context}]: ${msg}`);
 }
 
+async function upsertProjectMembership(
+  membership: ProjectMembershipInsert
+): Promise<void> {
+  const supabase = createClient();
+
+  const { error } = await supabase
+    .schema("public")
+    .from("project_memberships")
+    .upsert(
+      {
+        project_id: membership.project_id,
+        user_id: membership.user_id,
+        role: membership.role,
+        created_by: membership.created_by ?? null,
+      },
+      {
+        onConflict: "project_id,user_id",
+        ignoreDuplicates: false,
+      }
+    );
+
+  if (error) {
+    throw serviceError(
+      "Falha ao vincular participante ao projeto",
+      error,
+      "project_memberships.upsert"
+    );
+  }
+}
+
 export async function listProjectsForUser(
   userId: string
 ): Promise<ProjectRow[]> {
   const supabase = createClient();
 
-  const membershipsRes = await supabase
+  const membershipRes = await supabase
     .schema("public")
-    .from("organization_memberships")
-    .select("organization_id, role")
+    .from("project_memberships")
+    .select("project_id")
     .eq("user_id", userId);
 
-  if (membershipsRes.error) {
+  if (membershipRes.error) {
     throw serviceError(
-      "Falha ao buscar memberships de organização",
-      membershipsRes.error,
-      "organization_memberships"
+      "Falha ao buscar participações do projeto",
+      membershipRes.error,
+      "project_memberships.select"
     );
   }
 
-  const orgIds = (membershipsRes.data ?? []).map((m) => m.organization_id);
-  if (orgIds.length === 0) return [];
+  const projectIds = Array.from(
+    new Set((membershipRes.data ?? []).map((m) => m.project_id).filter(Boolean))
+  );
+
+  if (projectIds.length === 0) return [];
 
   const { data, error } = await supabase
     .schema("public")
     .from("projects")
     .select("*")
-    .in("organization_id", orgIds)
+    .in("id", projectIds)
     .order("created_at", { ascending: false });
 
-  if (error)
+  if (error) {
     throw serviceError("Falha ao listar projetos", error, "projects.select");
+  }
+
   return (data ?? []) as ProjectRow[];
 }
 
@@ -71,8 +119,38 @@ export async function getProjectByIdForUser(
   projectId: string,
   userId: string
 ): Promise<ProjectRow | null> {
-  const projects = await listProjectsForUser(userId);
-  return projects.find((p) => p.id === projectId) ?? null;
+  const supabase = createClient();
+
+  const membershipRes = await supabase
+    .schema("public")
+    .from("project_memberships")
+    .select("project_id")
+    .eq("project_id", projectId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (membershipRes.error) {
+    throw serviceError(
+      "Falha ao validar acesso ao projeto",
+      membershipRes.error,
+      "project_memberships.accessCheck"
+    );
+  }
+
+  if (!membershipRes.data) return null;
+
+  const { data, error } = await supabase
+    .schema("public")
+    .from("projects")
+    .select("*")
+    .eq("id", projectId)
+    .maybeSingle();
+
+  if (error) {
+    throw serviceError("Erro ao buscar projeto", error, "projects.selectById");
+  }
+
+  return (data as ProjectRow | null) ?? null;
 }
 
 export async function createProject(
@@ -96,11 +174,9 @@ export async function createProject(
 
   const effectiveUserId = userId ?? user.id;
 
-  // CHANGE: organização determinística: payload.organization_id vem do form
   let organizationId = payload.organization_id?.trim() || null;
 
   if (!organizationId) {
-    // fallback antigo: ORG_ADMIN
     const memberships = await getOrganizationMemberships(effectiveUserId);
     const orgAdminMembership = memberships.find(
       (m) => normalizeRole(m.role) === "ORG_ADMIN"
@@ -112,27 +188,35 @@ export async function createProject(
     throw new Error("Não foi possível determinar a organização do projeto.");
   }
 
-  const { data, error } = await supabase
-    .schema("public")
-    .from("projects")
-    .insert({
-      title: payload.title,
-      description: payload.description ?? null,
-      project_type: payload.project_type,
-      status: payload.status ?? "DRAFT",
-      organization_id: organizationId,
+  const rpcResponse = await supabase.rpc(
+    "create_project_secure" as never,
+    {
+      p_title: payload.title,
+      p_description: payload.description ?? null,
+      p_project_type: payload.project_type,
+      p_organization_id: organizationId,
+      p_metadata: (payload.metadata ?? {}) as never,
+    } as never
+  );
 
-      // CHANGE: satisfaz policy projects_insert (created_by = auth.uid())
-      created_by: user.id,
-    } as any)
-    .select("*")
-    .single();
+  const error = rpcResponse.error;
+  const data = rpcResponse.data as ProjectRow | null;
 
   if (error) {
-    throw serviceError("Falha ao criar projeto", error, "projects.insert");
+    throw serviceError(
+      "Falha ao criar projeto",
+      error,
+      "create_project_secure"
+    );
   }
 
-  return data as ProjectRow;
+  if (!data?.id) {
+    throw new Error(
+      "A função create_project_secure não retornou um projeto válido."
+    );
+  }
+
+  return data;
 }
 
 export async function getProjectsByOrganization(
@@ -147,8 +231,10 @@ export async function getProjectsByOrganization(
     .eq("organization_id", organization_id)
     .order("created_at", { ascending: false });
 
-  if (error)
+  if (error) {
     throw serviceError("Erro ao buscar projetos", error, "projects.select");
+  }
+
   return (data ?? []) as ProjectRow[];
 }
 
@@ -187,7 +273,124 @@ export async function getProjectById(projectId: string): Promise<ProjectRow> {
     .eq("id", projectId)
     .single();
 
-  if (error)
+  if (error) {
     throw serviceError("Erro ao buscar projeto", error, "projects.selectById");
+  }
+
   return data as ProjectRow;
+}
+
+export async function listProjectParticipants(
+  projectId: string
+): Promise<ProjectParticipantRow[]> {
+  const supabase = createClient();
+
+  const membershipRes = await supabase
+    .schema("public")
+    .from("project_memberships")
+    .select("user_id, role, created_at")
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: true });
+
+  if (membershipRes.error) {
+    throw serviceError(
+      "Falha ao listar participantes do projeto",
+      membershipRes.error,
+      "project_memberships.selectParticipants"
+    );
+  }
+
+  const memberships = membershipRes.data ?? [];
+  if (memberships.length === 0) return [];
+
+  const userIds = memberships.map((m) => m.user_id);
+
+  const profilesRes = await supabase
+    .schema("public")
+    .from("profiles")
+    .select("id, full_name, email")
+    .in("id", userIds);
+
+  if (profilesRes.error) {
+    throw serviceError(
+      "Falha ao buscar perfis dos participantes",
+      profilesRes.error,
+      "profiles.selectParticipants"
+    );
+  }
+
+  const profilesMap = new Map(
+    (profilesRes.data ?? []).map((profile) => [profile.id, profile])
+  );
+
+  return memberships.map((membership) => {
+    const profile = profilesMap.get(membership.user_id);
+    return {
+      user_id: membership.user_id,
+      role: membership.role as ProjectParticipantRow["role"],
+      created_at: membership.created_at,
+      full_name: profile?.full_name ?? null,
+      email: profile?.email ?? null,
+    };
+  });
+}
+
+export async function addProjectParticipant(
+  projectId: string,
+  userId: string,
+  role: "CONSULTANT" | "INVESTOR" | "VIEWER",
+  createdBy?: string
+): Promise<void> {
+  await upsertProjectMembership({
+    project_id: projectId,
+    user_id: userId,
+    role,
+    created_by: createdBy ?? null,
+  });
+}
+
+export async function removeProjectParticipant(
+  projectId: string,
+  userId: string
+): Promise<void> {
+  const supabase = createClient();
+
+  const currentRes = await supabase
+    .schema("public")
+    .from("project_memberships")
+    .select("role")
+    .eq("project_id", projectId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (currentRes.error) {
+    throw serviceError(
+      "Falha ao verificar participante do projeto",
+      currentRes.error,
+      "project_memberships.selectBeforeDelete"
+    );
+  }
+
+  if (!currentRes.data) return;
+
+  if (String(currentRes.data.role).toUpperCase() === "OWNER") {
+    throw new Error(
+      "O criador do projeto não pode ser removido dos participantes."
+    );
+  }
+
+  const { error } = await supabase
+    .schema("public")
+    .from("project_memberships")
+    .delete()
+    .eq("project_id", projectId)
+    .eq("user_id", userId);
+
+  if (error) {
+    throw serviceError(
+      "Falha ao remover participante do projeto",
+      error,
+      "project_memberships.delete"
+    );
+  }
 }
