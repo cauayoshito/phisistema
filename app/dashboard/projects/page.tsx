@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { listProjectsForUser } from "@/services/projects.service";
+import { PROJECT_STATUS_LABEL, type ProjectStatus } from "@/lib/status";
 
 export const dynamic = "force-dynamic";
 
@@ -33,65 +34,94 @@ function normalizeProjectType(value: string) {
     v === "RECURSOS_PROPRIOS" ||
     v === "INCENTIVADO" ||
     v === "RECURSOS_PUBLICOS"
-  )
+  ) {
     return v;
+  }
   return "ALL";
 }
 
 function projectTypeLabel(v: string) {
-  if (v === "RECURSOS_PROPRIOS") return "Recursos Próprios";
-  if (v === "INCENTIVADO") return "Incentivado";
-  if (v === "RECURSOS_PUBLICOS") return "Recursos Públicos";
+  const value = String(v ?? "")
+    .trim()
+    .toUpperCase();
+
+  if (value === "RECURSOS_PROPRIOS") return "Recursos Próprios";
+  if (value === "INCENTIVADO") return "Incentivado";
+  if (value === "RECURSOS_PUBLICOS") return "Recursos Públicos";
   return "Todos";
 }
 
 function badgeForType(v: string) {
   const t = String(v ?? "").toUpperCase();
-  if (t === "RECURSOS_PROPRIOS")
+
+  if (t === "RECURSOS_PROPRIOS") {
     return "bg-blue-50 text-blue-700 border-blue-200";
-  if (t === "INCENTIVADO")
+  }
+
+  if (t === "INCENTIVADO") {
     return "bg-purple-50 text-purple-700 border-purple-200";
-  if (t === "RECURSOS_PUBLICOS")
+  }
+
+  if (t === "RECURSOS_PUBLICOS") {
     return "bg-orange-50 text-orange-700 border-orange-200";
+  }
+
   return "bg-slate-50 text-slate-700 border-slate-200";
 }
 
 function badgeForStatus(v: string) {
   const s = String(v ?? "").toUpperCase();
+
   if (s === "DRAFT") return "bg-slate-100 text-slate-700 border-slate-200";
   if (s === "ENVIADO") return "bg-amber-50 text-amber-700 border-amber-200";
-  if (s === "EM_ANALISE")
+  if (s === "EM_ANALISE") {
     return "bg-yellow-50 text-yellow-800 border-yellow-200";
-  if (s === "APROVADO")
+  }
+  if (s === "APROVADO") {
     return "bg-emerald-50 text-emerald-700 border-emerald-200";
+  }
   if (s === "DEVOLVIDO") return "bg-rose-50 text-rose-700 border-rose-200";
+
   return "bg-slate-50 text-slate-700 border-slate-200";
+}
+
+function projectStatusLabel(value: unknown) {
+  const status = String(value ?? "")
+    .trim()
+    .toUpperCase() as ProjectStatus;
+
+  return PROJECT_STATUS_LABEL[status] ?? String(value ?? "-");
 }
 
 export default async function ProjectsPage({ searchParams }: Props) {
   const supabase = createClient();
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
   if (!user) redirect("/login");
 
   const q = readString(searchParams?.q);
   const type = normalizeProjectType(readString(searchParams?.type));
   const errorMessage = getSearchMessage(searchParams?.error);
 
-  // CHANGE: fonte única via service layer
   const allProjects = await listProjectsForUser(user.id);
 
   const projects = allProjects.filter((p: any) => {
-    if (type !== "ALL" && String(p.project_type).toUpperCase() !== type)
+    if (type !== "ALL" && String(p.project_type).toUpperCase() !== type) {
       return false;
+    }
+
     if (
       q &&
       !String(p.title ?? "")
         .toLowerCase()
         .includes(q.toLowerCase())
-    )
+    ) {
       return false;
+    }
+
     return true;
   });
 
@@ -143,6 +173,7 @@ export default async function ProjectsPage({ searchParams }: Props) {
               name="type"
               value={type !== "ALL" ? type : ""}
             />
+
             <input
               name="q"
               defaultValue={q}
@@ -235,6 +266,7 @@ export default async function ProjectsPage({ searchParams }: Props) {
                       >
                         {p.title}
                       </Link>
+
                       <span className="mt-1 text-xs text-slate-500">
                         ID: {p.id}
                       </span>
@@ -259,7 +291,7 @@ export default async function ProjectsPage({ searchParams }: Props) {
                         badgeForStatus(p.status),
                       ].join(" ")}
                     >
-                      {String(p.status ?? "")}
+                      {projectStatusLabel(p.status)}
                     </span>
                   </td>
 

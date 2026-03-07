@@ -1,9 +1,14 @@
-﻿// app/dashboard/page.tsx
-import Link from "next/link";
+﻿import Link from "next/link";
 import { requireUser } from "@/services/auth.service";
-import { createClient } from "@/lib/supabase/server";
 import StatCard from "@/components/dashboard/StatCard";
-import { PROJECT_STATUS_LABEL, REPORT_STATUS_LABEL } from "@/lib/status";
+import {
+  PROJECT_STATUS_LABEL,
+  REPORT_STATUS_LABEL,
+  type ProjectStatus,
+  type ReportStatus,
+} from "@/lib/status";
+import { listProjectsForUser } from "@/services/projects.service";
+import { listReportsForUser } from "@/services/reports.service";
 
 export const dynamic = "force-dynamic";
 
@@ -13,98 +18,89 @@ function nomeDoEmail(email?: string | null) {
   return nome.charAt(0).toUpperCase() + nome.slice(1);
 }
 
+function formatarDataHora(valor?: string | null) {
+  if (!valor) return "-";
+
+  const data = new Date(valor);
+  if (Number.isNaN(data.getTime())) return "-";
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(data);
+}
+
 function formatarData(valor?: string | null) {
   if (!valor) return "-";
-  return String(valor).replace("T", " ").replace("Z", "");
+
+  const data = new Date(valor);
+  if (Number.isNaN(data.getTime())) return "-";
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+  }).format(data);
+}
+
+function projectTypeLabel(v?: string | null) {
+  const value = String(v ?? "")
+    .trim()
+    .toUpperCase();
+
+  if (value === "RECURSOS_PROPRIOS") return "Recursos Próprios";
+  if (value === "INCENTIVADO") return "Incentivado";
+  if (value === "RECURSOS_PUBLICOS") return "Recursos Públicos";
+  return "-";
+}
+
+function projectStatusLabel(v?: string | null) {
+  const value = String(v ?? "")
+    .trim()
+    .toUpperCase() as ProjectStatus;
+  return PROJECT_STATUS_LABEL[value] ?? String(v ?? "-");
+}
+
+function reportStatusLabel(v?: string | null) {
+  const value = String(v ?? "")
+    .trim()
+    .toUpperCase() as ReportStatus;
+  return REPORT_STATUS_LABEL[value] ?? String(v ?? "-");
 }
 
 export default async function DashboardPage() {
   const user = await requireUser();
-  const supabase = createClient();
 
   const nome = nomeDoEmail(user.email);
 
-  // Defaults à prova de policy: nada aqui pode quebrar a tela
-  let totalProjetos = 0;
-  let projetosEmAnalise = 0;
+  let projetosRecentes: Array<any> = [];
+  let relatoriosRecentes: Array<any> = [];
 
-  let totalRelatorios = 0;
-  let relatoriosSubmetidos = 0;
-
-  // Projetos recentes (se policy bloquear, fica vazio)
-  let projetosRecentes: Array<{
-    id: string;
-    title: string | null;
-    name: string | null;
-    status: string | null;
-    created_at: string | null;
-  }> = [];
-
-  // Relatórios recentes (opcional, mas ajuda muito o dashboard)
-  let relatoriosRecentes: Array<{
-    id: string;
-    title: string | null;
-    status: string | null;
-    created_at: string | null;
-    project_id: string | null;
-  }> = [];
-
-  // KPIs: usa SELECT status e calcula em memória (não quebra com RLS, só pode ficar vazio)
   try {
-    const [projectsRes, reportsRes] = await Promise.all([
-      supabase.schema("public").from("projects").select("status"),
-      supabase.schema("public").from("reports").select("status"),
-    ]);
-
-    const projects = (projectsRes.data ?? []) as Array<{
-      status: string | null;
-    }>;
-    const reports = (reportsRes.data ?? []) as Array<{ status: string | null }>;
-
-    totalProjetos = projects.length;
-    projetosEmAnalise = projects.filter(
-      (p) => p.status === "EM_ANALISE"
-    ).length;
-
-    totalRelatorios = reports.length;
-    relatoriosSubmetidos = reports.filter(
-      (r) => r.status === "SUBMITTED"
-    ).length;
+    projetosRecentes = await listProjectsForUser(user.id);
   } catch {
-    // fallback: mantém zeros
+    projetosRecentes = [];
   }
 
-  // Lista rápida de projetos
   try {
-    const { data } = await supabase
-      .schema("public")
-      .from("projects")
-      .select("id, title, name, status, created_at")
-      .order("created_at", { ascending: false })
-      .limit(6);
-
-    projetosRecentes = (data ?? []) as typeof projetosRecentes;
+    relatoriosRecentes = await listReportsForUser(user.id);
   } catch {
-    // mantém []
+    relatoriosRecentes = [];
   }
 
-  // Lista rápida de relatórios
-  try {
-    const { data } = await supabase
-      .schema("public")
-      .from("reports")
-      .select("id, title, status, created_at, project_id")
-      .order("created_at", { ascending: false })
-      .limit(6);
+  const totalProjetos = projetosRecentes.length;
+  const projetosEmAnalise = projetosRecentes.filter(
+    (p) => String(p.status ?? "").toUpperCase() === "EM_ANALISE"
+  ).length;
 
-    relatoriosRecentes = (data ?? []) as typeof relatoriosRecentes;
-  } catch {
-    // mantém []
-  }
+  const totalRelatorios = relatoriosRecentes.length;
+  const relatoriosSubmetidos = relatoriosRecentes.filter(
+    (r) => String(r.status ?? "").toUpperCase() === "SUBMITTED"
+  ).length;
+
+  const projetosTop = projetosRecentes.slice(0, 6);
+  const relatoriosTop = relatoriosRecentes.slice(0, 6);
 
   return (
     <div className="space-y-8">
-      {/* Boas vindas + ações */}
       <section className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">
@@ -112,9 +108,6 @@ export default async function DashboardPage() {
           </h1>
           <p className="mt-1 text-sm text-slate-600">
             Visão geral do seu sistema hoje.
-          </p>
-          <p className="mt-3 text-xs text-slate-500">
-            Usuário autenticado: {user.email ?? user.id}
           </p>
         </div>
 
@@ -125,8 +118,9 @@ export default async function DashboardPage() {
           >
             ⬇️ Ir para relatórios
           </Link>
+
           <Link
-            href="/dashboard/projects"
+            href="/dashboard/projects/new"
             className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
           >
             ➕ Novo projeto
@@ -134,7 +128,6 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      {/* KPIs */}
       <section className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total de projetos"
@@ -148,7 +141,7 @@ export default async function DashboardPage() {
           value={projetosEmAnalise}
           icon={<span>🧠</span>}
           tone="orange"
-          tag="EM_ANALISE"
+          tag="Em análise"
         />
         <StatCard
           title="Relatórios"
@@ -162,11 +155,10 @@ export default async function DashboardPage() {
           value={relatoriosSubmetidos}
           icon={<span>📤</span>}
           tone="green"
-          tag="SUBMITTED"
+          tag="Enviados"
         />
       </section>
 
-      {/* Atalhos */}
       <section className="grid gap-4 sm:grid-cols-3">
         <Link
           href="/dashboard/projects"
@@ -199,7 +191,6 @@ export default async function DashboardPage() {
         </Link>
       </section>
 
-      {/* Tabela: projetos recentes */}
       <section className="overflow-hidden rounded-xl border bg-white">
         <div className="flex items-center justify-between border-b bg-slate-50 px-6 py-4">
           <h3 className="text-sm font-semibold text-slate-900">
@@ -218,26 +209,32 @@ export default async function DashboardPage() {
             <thead className="border-b text-xs uppercase text-slate-500">
               <tr>
                 <th className="px-6 py-3">Projeto</th>
+                <th className="px-6 py-3">Tipo</th>
                 <th className="px-6 py-3">Status</th>
                 <th className="px-6 py-3">Criado em</th>
               </tr>
             </thead>
             <tbody>
-              {projetosRecentes.map((p) => {
-                const label = p.title ?? p.name ?? p.id;
-                const statusKey = String(
-                  p.status ?? ""
-                ) as keyof typeof PROJECT_STATUS_LABEL;
-                const statusLabel =
-                  (PROJECT_STATUS_LABEL as any)[statusKey] ??
-                  String(p.status ?? "-");
+              {projetosTop.map((p) => {
+                const label =
+                  p.title ?? p.name ?? p.project_name ?? "Projeto sem título";
 
                 return (
                   <tr key={p.id} className="border-b last:border-0">
                     <td className="px-6 py-4 font-medium text-slate-900">
-                      {label}
+                      <Link
+                        href={`/dashboard/projects/${p.id}?tab=overview`}
+                        className="hover:underline"
+                      >
+                        {label}
+                      </Link>
                     </td>
-                    <td className="px-6 py-4 text-slate-600">{statusLabel}</td>
+                    <td className="px-6 py-4 text-slate-600">
+                      {projectTypeLabel(p.project_type)}
+                    </td>
+                    <td className="px-6 py-4 text-slate-600">
+                      {projectStatusLabel(p.status)}
+                    </td>
                     <td className="px-6 py-4 text-slate-600">
                       {formatarData(p.created_at)}
                     </td>
@@ -245,10 +242,10 @@ export default async function DashboardPage() {
                 );
               })}
 
-              {projetosRecentes.length === 0 && (
+              {projetosTop.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="px-6 py-6 text-slate-500">
-                    Nenhum projeto encontrado (ou a policy não permite listar).
+                  <td colSpan={4} className="px-6 py-6 text-slate-500">
+                    Nenhum projeto recente.
                   </td>
                 </tr>
               )}
@@ -257,7 +254,6 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      {/* Tabela: relatórios recentes */}
       <section className="overflow-hidden rounded-xl border bg-white">
         <div className="flex items-center justify-between border-b bg-slate-50 px-6 py-4">
           <h3 className="text-sm font-semibold text-slate-900">
@@ -282,40 +278,32 @@ export default async function DashboardPage() {
               </tr>
             </thead>
             <tbody>
-              {relatoriosRecentes.map((r) => {
-                const statusKey = String(
-                  r.status ?? ""
-                ) as keyof typeof REPORT_STATUS_LABEL;
-                const statusLabel =
-                  (REPORT_STATUS_LABEL as any)[statusKey] ??
-                  String(r.status ?? "-");
+              {relatoriosTop.map((r) => (
+                <tr key={r.id} className="border-b last:border-0">
+                  <td className="px-6 py-4 font-medium text-slate-900">
+                    <Link
+                      href={`/dashboard/reports/${r.id}`}
+                      className="text-blue-600 hover:underline"
+                    >
+                      {r.title || "Sem título"}
+                    </Link>
+                  </td>
+                  <td className="px-6 py-4 text-slate-600">
+                    {reportStatusLabel(r.status)}
+                  </td>
+                  <td className="px-6 py-4 text-slate-600">
+                    {formatarDataHora(r.created_at)}
+                  </td>
+                  <td className="px-6 py-4 text-slate-600">
+                    {r.project_label || "Projeto vinculado"}
+                  </td>
+                </tr>
+              ))}
 
-                return (
-                  <tr key={r.id} className="border-b last:border-0">
-                    <td className="px-6 py-4 font-medium text-slate-900">
-                      <Link
-                        href={`/dashboard/reports/${r.id}`}
-                        className="text-blue-600 hover:underline"
-                      >
-                        {r.title || "Sem título"}
-                      </Link>
-                    </td>
-                    <td className="px-6 py-4 text-slate-600">{statusLabel}</td>
-                    <td className="px-6 py-4 text-slate-600">
-                      {formatarData(r.created_at)}
-                    </td>
-                    <td className="px-6 py-4 text-slate-600">
-                      {r.project_id ?? "-"}
-                    </td>
-                  </tr>
-                );
-              })}
-
-              {relatoriosRecentes.length === 0 && (
+              {relatoriosTop.length === 0 && (
                 <tr>
                   <td colSpan={4} className="px-6 py-6 text-slate-500">
-                    Nenhum relatório encontrado (ou a policy não permite
-                    listar).
+                    Nenhum relatório recente.
                   </td>
                 </tr>
               )}
