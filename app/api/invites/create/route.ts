@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { createRouteHandlerClient } from "@/lib/supabase/server";
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { cookies } from "next/headers";
+import type { Database } from "@/types/database";
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -11,23 +13,29 @@ type CreateInviteBody = {
   expiresInDays?: number;
 };
 
+type CreateOrgInviteRow = {
+  invite_id: string;
+  token: string;
+  expires_at: string;
+};
+
 function isUuid(value: string): boolean {
   return UUID_REGEX.test(value);
 }
 
 function isEmail(value: string): boolean {
-  // validação leve (sem exagero)
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
 export async function POST(request: Request) {
   try {
     let body: CreateInviteBody;
+
     try {
       body = (await request.json()) as CreateInviteBody;
     } catch (error) {
       return NextResponse.json(
-        { error: "Body JSON invalido.", details: error },
+        { error: "Body JSON inválido.", details: error },
         { status: 400 }
       );
     }
@@ -43,25 +51,25 @@ export async function POST(request: Request) {
 
     if (!organizationId || !email) {
       return NextResponse.json(
-        { error: "Campos obrigatorios: organizationId, email." },
+        { error: "Campos obrigatórios: organizationId, email." },
         { status: 400 }
       );
     }
 
     if (!isUuid(organizationId)) {
       return NextResponse.json(
-        { error: "organizationId invalido (UUID esperado)." },
+        { error: "organizationId inválido (UUID esperado)." },
         { status: 400 }
       );
     }
 
     if (!isEmail(email)) {
-      return NextResponse.json({ error: "Email invalido." }, { status: 400 });
+      return NextResponse.json({ error: "E-mail inválido." }, { status: 400 });
     }
 
     if (role !== "ORG_ADMIN" && role !== "ORG_MEMBER") {
       return NextResponse.json(
-        { error: "role invalido. Use ORG_ADMIN ou ORG_MEMBER." },
+        { error: "role inválido. Use ORG_ADMIN ou ORG_MEMBER." },
         { status: 400 }
       );
     }
@@ -72,13 +80,12 @@ export async function POST(request: Request) {
       expiresInDays > 90
     ) {
       return NextResponse.json(
-        { error: "expiresInDays invalido. Use inteiro entre 1 e 90." },
+        { error: "expiresInDays inválido. Use inteiro entre 1 e 90." },
         { status: 400 }
       );
     }
 
-    // IMPORTANT: route handler client deve persistir cookies (refresh de sessão)
-    const supabase = createRouteHandlerClient();
+    const supabase = createRouteHandlerClient<Database>({ cookies });
 
     const {
       data: { user },
@@ -86,12 +93,10 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json({ error: "Nao autenticado." }, { status: 401 });
+      return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
     }
 
-    // Não faz SELECT em organization_memberships (pode falhar por RLS).
-    // A permissão é validada dentro da RPC create_org_invite (phi_is_org_admin).
-    const { data, error } = await supabase.rpc(
+    const rpcResponse = await supabase.rpc(
       "create_org_invite" as never,
       {
         p_organization_id: organizationId,
@@ -101,20 +106,26 @@ export async function POST(request: Request) {
       } as never
     );
 
+    const error = rpcResponse.error;
+    const data = rpcResponse.data as
+      | CreateOrgInviteRow
+      | CreateOrgInviteRow[]
+      | null;
+
     if (error) {
       const message = error.message ?? "Erro desconhecido";
       const lower = message.toLowerCase();
 
       if (lower.includes("not authenticated")) {
         return NextResponse.json(
-          { error: "Nao autenticado.", details: message },
+          { error: "Não autenticado.", details: message },
           { status: 401 }
         );
       }
 
       if (lower.includes("not allowed")) {
         return NextResponse.json(
-          { error: "Sem permissao para criar convite.", details: message },
+          { error: "Sem permissão para criar convite.", details: message },
           { status: 403 }
         );
       }
@@ -126,6 +137,7 @@ export async function POST(request: Request) {
     }
 
     const payload = Array.isArray(data) ? data[0] : data;
+
     if (!payload) {
       return NextResponse.json(
         { error: "RPC create_org_invite retornou vazio." },
@@ -133,10 +145,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const token = String(payload.token);
+    const token = String(payload.token ?? "");
     const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "")
       .trim()
       .replace(/\/$/, "");
+
     const acceptUrl = appUrl
       ? `${appUrl}/accept-invite?token=${encodeURIComponent(token)}`
       : `/accept-invite?token=${encodeURIComponent(token)}`;
