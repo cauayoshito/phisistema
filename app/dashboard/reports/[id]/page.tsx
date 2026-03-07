@@ -16,13 +16,49 @@ type Props = {
 
 function formatDate(value: unknown) {
   if (!value) return "-";
-  const s = String(value);
-  return s.length >= 10 ? s.slice(0, 10) : s;
+
+  const d = new Date(String(value));
+  if (Number.isNaN(d.getTime())) return "-";
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+  }).format(d);
+}
+
+function formatDateTime(value: unknown) {
+  if (!value) return "-";
+
+  const d = new Date(String(value));
+  if (Number.isNaN(d.getTime())) return "-";
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "medium",
+  }).format(d);
 }
 
 function fallbackTitle(title: string | null, start: unknown, end: unknown) {
   if (title && title.trim()) return title;
   return `Relatório ${formatDate(start)} → ${formatDate(end)}`;
+}
+
+function fallback(value: unknown, fb = "-") {
+  const s = String(value ?? "").trim();
+  return s.length ? s : fb;
+}
+
+function shortId(value: unknown) {
+  const s = String(value ?? "").trim();
+  if (!s) return "-";
+  if (s.length <= 16) return s;
+  return `${s.slice(0, 8)}...${s.slice(-4)}`;
+}
+
+function reportStatusLabel(value: unknown) {
+  const key = String(value ?? "")
+    .trim()
+    .toUpperCase() as ReportStatus;
+  return REPORT_STATUS_LABEL[key] ?? fallback(value);
 }
 
 async function safeSubmit(reportId: string) {
@@ -45,7 +81,7 @@ export default async function ReportDetailPage({ params }: Props) {
   const { report, project, currentVersion } = detail;
 
   const status = String(report.status ?? "");
-  const statusLabel = REPORT_STATUS_LABEL[status as ReportStatus] ?? status;
+  const statusLabel = reportStatusLabel(status);
 
   const canSubmit = status === "DRAFT";
   const canReopen = status !== "DRAFT";
@@ -63,10 +99,10 @@ export default async function ReportDetailPage({ params }: Props) {
             )}
           </h1>
 
-          <p className="text-sm text-slate-600 mt-1">
+          <p className="mt-1 text-sm text-slate-600">
             Projeto:{" "}
             <span className="font-medium">
-              {project?.name ?? String(report.project_id)}
+              {project?.name ?? "Projeto vinculado"}
             </span>
           </p>
 
@@ -101,8 +137,8 @@ export default async function ReportDetailPage({ params }: Props) {
             </Link>
           ) : (
             <span
-              className="rounded bg-slate-300 px-4 py-2 text-sm text-white cursor-not-allowed"
-              title="Somente relatórios em DRAFT podem ser editados."
+              className="cursor-not-allowed rounded bg-slate-300 px-4 py-2 text-sm text-white"
+              title="Somente relatórios em rascunho podem ser editados."
             >
               Digitar relatório
             </span>
@@ -111,7 +147,7 @@ export default async function ReportDetailPage({ params }: Props) {
           {canSubmit && (
             <form action={safeSubmit.bind(null, reportId)}>
               <button
-                className="rounded bg-emerald-600 px-4 py-2 text-white text-sm"
+                className="rounded bg-emerald-600 px-4 py-2 text-sm text-white"
                 type="submit"
               >
                 Enviar
@@ -122,7 +158,7 @@ export default async function ReportDetailPage({ params }: Props) {
           {canReopen && (
             <form action={safeReopen.bind(null, reportId)}>
               <button
-                className="rounded bg-slate-800 px-4 py-2 text-white text-sm"
+                className="rounded bg-slate-800 px-4 py-2 text-sm text-white"
                 type="submit"
               >
                 Reabrir p/ rascunho
@@ -135,40 +171,32 @@ export default async function ReportDetailPage({ params }: Props) {
       <section className="rounded-xl border bg-white p-4">
         <h2 className="font-semibold">Dados</h2>
 
-        <div className="mt-3 grid gap-3 sm:grid-cols-3 text-sm">
+        <div className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
           <div>
-            <div className="text-xs text-slate-500">Report ID</div>
-            <div className="font-mono break-all">{String(report.id)}</div>
+            <div className="text-xs text-slate-500">Identificador</div>
+            <div className="font-medium text-slate-900">
+              {shortId(report.id)}
+            </div>
           </div>
 
           <div>
             <div className="text-xs text-slate-500">Criado em</div>
-            <div>{String(report.created_at ?? "-").slice(0, 19)}</div>
+            <div>{formatDateTime(report.created_at)}</div>
           </div>
 
           <div>
-            <div className="text-xs text-slate-500">
-              Current version (reports)
-            </div>
-            <div>{String(report.current_version ?? "-")}</div>
+            <div className="text-xs text-slate-500">Versão atual</div>
+            <div>{fallback(report.current_version)}</div>
           </div>
 
           <div>
-            <div className="text-xs text-slate-500">Submitted at</div>
-            <div>
-              {report.submitted_at
-                ? String(report.submitted_at).slice(0, 19)
-                : "-"}
-            </div>
+            <div className="text-xs text-slate-500">Enviado em</div>
+            <div>{formatDateTime(report.submitted_at)}</div>
           </div>
 
           <div>
-            <div className="text-xs text-slate-500">Approved at</div>
-            <div>
-              {report.approved_at
-                ? String(report.approved_at).slice(0, 19)
-                : "-"}
-            </div>
+            <div className="text-xs text-slate-500">Aprovado em</div>
+            <div>{formatDateTime(report.approved_at)}</div>
           </div>
         </div>
       </section>
@@ -176,7 +204,7 @@ export default async function ReportDetailPage({ params }: Props) {
       <section className="rounded-xl border bg-white p-4">
         <h2 className="font-semibold">Versão atual</h2>
         <p className="text-xs text-slate-600">
-          Vem de report_versions (se existir e estiver populando).
+          Informações da versão ativa do relatório.
         </p>
 
         {!currentVersion ? (
@@ -184,30 +212,26 @@ export default async function ReportDetailPage({ params }: Props) {
             Nenhuma versão encontrada.
           </div>
         ) : (
-          <div className="mt-3 grid gap-3 sm:grid-cols-4 text-sm">
+          <div className="mt-3 grid gap-3 text-sm sm:grid-cols-4">
             <div>
-              <div className="text-xs text-slate-500">version_number</div>
+              <div className="text-xs text-slate-500">Versão</div>
               <div>v{String(currentVersion.version_number)}</div>
             </div>
 
             <div>
-              <div className="text-xs text-slate-500">status</div>
-              <div>{String(currentVersion.status ?? "-")}</div>
+              <div className="text-xs text-slate-500">Status</div>
+              <div>{reportStatusLabel(currentVersion.status)}</div>
             </div>
 
             <div>
-              <div className="text-xs text-slate-500">created_at</div>
-              <div>
-                {currentVersion.created_at
-                  ? String(currentVersion.created_at).slice(0, 19)
-                  : "-"}
-              </div>
+              <div className="text-xs text-slate-500">Criado em</div>
+              <div>{formatDateTime(currentVersion.created_at)}</div>
             </div>
 
             <div>
-              <div className="text-xs text-slate-500">created_by</div>
-              <div className="font-mono text-xs break-all">
-                {String(currentVersion.created_by ?? "-")}
+              <div className="text-xs text-slate-500">Criado por</div>
+              <div className="text-slate-700">
+                {shortId(currentVersion.created_by)}
               </div>
             </div>
           </div>

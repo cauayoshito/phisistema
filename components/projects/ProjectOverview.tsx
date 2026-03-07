@@ -1,8 +1,11 @@
 // components/projects/ProjectOverview.tsx
 
+import { PROJECT_STATUS_LABEL, type ProjectStatus } from "@/lib/status";
+
 type ProjectLike = {
   id: string;
-  title: string;
+  title?: string | null;
+  name?: string | null;
   status?: string | null;
   project_type?: string | null;
   organization_id?: string | null;
@@ -16,9 +19,14 @@ type Props = {
 
 function formatDate(value?: string | null) {
   if (!value) return "—";
+
   const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleString("pt-BR");
+  if (Number.isNaN(d.getTime())) return "—";
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "medium",
+  }).format(d);
 }
 
 function fallback(v?: string | null, fb = "—") {
@@ -26,13 +34,43 @@ function fallback(v?: string | null, fb = "—") {
   return s.length ? s : fb;
 }
 
+function projectStatusLabel(value?: string | null) {
+  const key = String(value ?? "")
+    .trim()
+    .toUpperCase() as ProjectStatus;
+  return PROJECT_STATUS_LABEL[key] ?? fallback(value);
+}
+
+function projectTypeLabel(value?: string | null) {
+  const v = String(value ?? "")
+    .trim()
+    .toUpperCase();
+
+  if (v === "RECURSOS_PROPRIOS") return "Recursos Próprios";
+  if (v === "RECURSOS_PUBLICOS") return "Recursos Públicos";
+  if (v === "INCENTIVADO") return "Incentivado";
+
+  return fallback(value);
+}
+
+function organizationLabel(value?: string | null) {
+  const v = String(value ?? "").trim();
+  if (!v) return "Não vinculada";
+
+  if (v.length <= 12) return v;
+
+  return `${v.slice(0, 8)}...${v.slice(-4)}`;
+}
+
 export default function ProjectOverview({ project }: Props) {
+  const title = project.title ?? project.name ?? "Projeto sem título";
+
   return (
     <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
         <h2 className="text-base font-semibold text-slate-900">Visão geral</h2>
         <p className="mt-1 text-sm text-slate-600">
-          Informações principais do projeto (resumo).
+          Informações principais do projeto.
         </p>
       </div>
 
@@ -43,7 +81,7 @@ export default function ProjectOverview({ project }: Props) {
               Título
             </p>
             <p className="mt-1 text-sm font-medium text-slate-900">
-              {fallback(project.title)}
+              {fallback(title)}
             </p>
           </div>
 
@@ -52,7 +90,7 @@ export default function ProjectOverview({ project }: Props) {
               Status
             </p>
             <p className="mt-1 text-sm font-medium text-slate-900">
-              {fallback(project.status)}
+              {projectStatusLabel(project.status)}
             </p>
           </div>
 
@@ -61,7 +99,7 @@ export default function ProjectOverview({ project }: Props) {
               Tipo
             </p>
             <p className="mt-1 text-sm font-medium text-slate-900">
-              {fallback(project.project_type)}
+              {projectTypeLabel(project.project_type)}
             </p>
           </div>
 
@@ -69,8 +107,8 @@ export default function ProjectOverview({ project }: Props) {
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Organização
             </p>
-            <p className="mt-1 break-all text-sm font-medium text-slate-900">
-              {fallback(project.organization_id)}
+            <p className="mt-1 text-sm font-medium text-slate-900">
+              {organizationLabel(project.organization_id)}
             </p>
           </div>
 
@@ -83,12 +121,12 @@ export default function ProjectOverview({ project }: Props) {
             </p>
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              ID
+              Identificador interno
             </p>
-            <p className="mt-1 break-all text-sm font-medium text-slate-900">
-              {fallback(project.id)}
+            <p className="mt-1 text-sm text-slate-600">
+              Registro interno do sistema.
             </p>
           </div>
 
