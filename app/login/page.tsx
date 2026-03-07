@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -36,10 +37,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
       <form
         onSubmit={onSubmit}
-        className="w-full max-w-md rounded-xl border bg-white p-6"
+        className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
       >
         <div className="flex items-center gap-3">
           <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white p-1">
@@ -52,37 +53,78 @@ export default function LoginPage() {
               priority
             />
           </div>
+
           <div>
-            <h1 className="text-xl font-bold">Transparência Social</h1>
-            <p className="text-sm text-slate-600">Entre para acessar sua conta</p>
+            <h1 className="text-xl font-bold text-slate-900">
+              Transparência Social
+            </h1>
+            <p className="text-sm text-slate-600">
+              Entre para acessar sua conta
+            </p>
           </div>
         </div>
 
-        <label className="mt-6 block text-sm font-medium">Email</label>
+        <label
+          htmlFor="email"
+          className="mt-6 block text-sm font-medium text-slate-700"
+        >
+          Email
+        </label>
         <input
-          className="mt-2 w-full rounded-lg border px-3 py-2"
+          id="email"
+          className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           type="email"
+          autoComplete="email"
+          required
         />
 
-        <label className="mt-4 block text-sm font-medium">Senha</label>
+        <label
+          htmlFor="password"
+          className="mt-4 block text-sm font-medium text-slate-700"
+        >
+          Senha
+        </label>
         <input
-          className="mt-2 w-full rounded-lg border px-3 py-2"
+          id="password"
+          className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           type="password"
+          autoComplete="current-password"
+          required
         />
 
-        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+        {error && (
+          <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+            {error}
+          </p>
+        )}
 
         <button
           type="submit"
           disabled={loading}
-          className="mt-6 w-full rounded-lg bg-blue-600 py-2 font-semibold text-white disabled:opacity-60"
+          className="mt-6 w-full rounded-lg bg-blue-600 py-2.5 font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
         >
           {loading ? "Entrando..." : "Entrar"}
         </button>
+
+        <div className="mt-4 flex items-center justify-between gap-4 text-sm">
+          <Link
+            href="/forgot-password"
+            className="text-slate-600 transition hover:text-slate-900 hover:underline"
+          >
+            Esqueci minha senha
+          </Link>
+
+          <Link
+            href="/signup"
+            className="font-medium text-blue-600 transition hover:text-blue-700 hover:underline"
+          >
+            Criar conta
+          </Link>
+        </div>
       </form>
     </div>
   );
