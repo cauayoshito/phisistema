@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import InviteMemberButton from "@/components/organizations/InviteMemberButton";
 import {
   getOrganizationByIdForUser,
   getProfileById,
@@ -105,7 +106,7 @@ export default async function OrganizationDetailPage({
   const success = msg(searchParams?.success);
 
   return (
-    <main className="mx-auto max-w-6xl p-6 space-y-6">
+    <main className="mx-auto max-w-6xl space-y-6 p-6">
       <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">
@@ -124,7 +125,7 @@ export default async function OrganizationDetailPage({
             ) : null}
           </div>
 
-          {updatedByProfile && org.updated_at && (
+          {updatedByProfile && org.updated_at ? (
             <p className="mt-3 text-sm text-slate-600">
               Última alteração por{" "}
               <span className="font-medium">
@@ -134,28 +135,35 @@ export default async function OrganizationDetailPage({
               </span>{" "}
               em {formatDate(org.updated_at)}.
             </p>
-          )}
+          ) : null}
         </div>
 
-        <Link
-          className="inline-flex items-center rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          href={`/dashboard/organizations/${orgId}/documents`}
-        >
-          Documentos da organização
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <InviteMemberButton
+            organizationId={orgId}
+            organizationName={org.name}
+          />
+
+          <Link
+            className="inline-flex items-center rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            href={`/dashboard/organizations/${orgId}/documents`}
+          >
+            Documentos da organização
+          </Link>
+        </div>
       </header>
 
-      {error && (
+      {error ? (
         <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
           {error}
         </div>
-      )}
+      ) : null}
 
-      {success && (
+      {success ? (
         <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800">
           {success}
         </div>
-      )}
+      ) : null}
 
       <section className="grid gap-6 lg:grid-cols-[1.6fr_0.9fr]">
         <form
@@ -342,7 +350,7 @@ export default async function OrganizationDetailPage({
             </label>
           </div>
 
-          <button className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">
+          <button className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700">
             Salvar dados
           </button>
         </form>
@@ -382,19 +390,28 @@ export default async function OrganizationDetailPage({
                 accept="image/*"
                 className="block text-sm"
               />
-              <button className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90">
+              <button className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90">
                 Enviar logo
               </button>
             </div>
           </form>
 
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-900">
-              Membros vinculados
-            </h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Pessoas com acesso à organização.
-            </p>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">
+                  Membros vinculados
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Pessoas com acesso à organização.
+                </p>
+              </div>
+
+              <InviteMemberButton
+                organizationId={orgId}
+                organizationName={org.name}
+              />
+            </div>
 
             <div className="mt-4 space-y-3">
               {members.length === 0 ? (
@@ -614,7 +631,7 @@ export default async function OrganizationDetailPage({
           </label>
         </div>
 
-        <button className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">
+        <button className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700">
           Salvar questionário
         </button>
       </form>
