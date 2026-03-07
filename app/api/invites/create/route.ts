@@ -35,7 +35,7 @@ export async function POST(request: Request) {
       body = (await request.json()) as CreateInviteBody;
     } catch (error) {
       return NextResponse.json(
-        { error: "Body JSON inválido.", details: error },
+        { error: "Não foi possível ler os dados do convite.", details: error },
         { status: 400 }
       );
     }
@@ -51,25 +51,28 @@ export async function POST(request: Request) {
 
     if (!organizationId || !email) {
       return NextResponse.json(
-        { error: "Campos obrigatórios: organizationId, email." },
+        { error: "Preencha os campos obrigatórios: organização e e-mail." },
         { status: 400 }
       );
     }
 
     if (!isUuid(organizationId)) {
       return NextResponse.json(
-        { error: "organizationId inválido (UUID esperado)." },
+        { error: "A organização informada é inválida." },
         { status: 400 }
       );
     }
 
     if (!isEmail(email)) {
-      return NextResponse.json({ error: "E-mail inválido." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Informe um e-mail válido para enviar o convite." },
+        { status: 400 }
+      );
     }
 
     if (role !== "ORG_ADMIN" && role !== "ORG_MEMBER") {
       return NextResponse.json(
-        { error: "role inválido. Use ORG_ADMIN ou ORG_MEMBER." },
+        { error: "O papel informado para o convite é inválido." },
         { status: 400 }
       );
     }
@@ -80,7 +83,9 @@ export async function POST(request: Request) {
       expiresInDays > 90
     ) {
       return NextResponse.json(
-        { error: "expiresInDays inválido. Use inteiro entre 1 e 90." },
+        {
+          error: "A validade do convite deve ser um número entre 1 e 90 dias.",
+        },
         { status: 400 }
       );
     }
@@ -93,7 +98,10 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+      return NextResponse.json(
+        { error: "Faça login para gerar um convite." },
+        { status: 401 }
+      );
     }
 
     const rpcResponse = await supabase.rpc(
@@ -118,20 +126,59 @@ export async function POST(request: Request) {
 
       if (lower.includes("not authenticated")) {
         return NextResponse.json(
-          { error: "Não autenticado.", details: message },
+          {
+            error: "Faça login para gerar um convite.",
+            details: message,
+          },
           { status: 401 }
         );
       }
 
       if (lower.includes("not allowed")) {
         return NextResponse.json(
-          { error: "Sem permissão para criar convite.", details: message },
+          {
+            error:
+              "Você não tem permissão para convidar membros nesta organização.",
+            details: message,
+          },
           { status: 403 }
         );
       }
 
+      if (
+        lower.includes("email") &&
+        lower.includes("already") &&
+        lower.includes("member")
+      ) {
+        return NextResponse.json(
+          {
+            error: "Este usuário já faz parte da organização.",
+            details: message,
+          },
+          { status: 400 }
+        );
+      }
+
+      if (
+        lower.includes("invite") &&
+        lower.includes("already") &&
+        (lower.includes("pending") || lower.includes("exists"))
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Já existe um convite pendente para este e-mail. Gere um novo link ou aguarde o aceite.",
+            details: message,
+          },
+          { status: 400 }
+        );
+      }
+
       return NextResponse.json(
-        { error: "Falha ao criar convite.", details: message },
+        {
+          error: "Não foi possível gerar o convite agora.",
+          details: message,
+        },
         { status: 500 }
       );
     }
@@ -140,7 +187,7 @@ export async function POST(request: Request) {
 
     if (!payload) {
       return NextResponse.json(
-        { error: "RPC create_org_invite retornou vazio." },
+        { error: "O convite foi criado, mas não retornou os dados esperados." },
         { status: 500 }
       );
     }
@@ -166,8 +213,11 @@ export async function POST(request: Request) {
   } catch (error) {
     return NextResponse.json(
       {
-        error: "Erro interno ao criar convite.",
-        details: error instanceof Error ? error.message : error,
+        error: "Ocorreu um erro interno ao gerar o convite.",
+        details:
+          error instanceof Error
+            ? { message: error.message, stack: error.stack }
+            : error,
       },
       { status: 500 }
     );
