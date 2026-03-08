@@ -138,10 +138,12 @@ export default async function ProjectsPage({ searchParams }: Props) {
   };
 
   return (
-    <main className="mx-auto max-w-7xl p-6 space-y-6">
+    <main className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Projetos</h1>
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
+            Projetos
+          </h1>
           <p className="mt-1 text-sm text-slate-600">
             Gerencie e acompanhe todos os seus projetos filantrópicos.
           </p>
@@ -149,7 +151,7 @@ export default async function ProjectsPage({ searchParams }: Props) {
 
         <Link
           href="/dashboard/projects/new"
-          className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700"
+          className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 sm:w-auto"
         >
           Novo Projeto
         </Link>
@@ -162,9 +164,9 @@ export default async function ProjectsPage({ searchParams }: Props) {
       )}
 
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <form
-            className="relative w-full md:w-96"
+            className="w-full lg:w-96"
             action={makeHref({})}
             method="get"
           >
@@ -182,54 +184,56 @@ export default async function ProjectsPage({ searchParams }: Props) {
             />
           </form>
 
-          <div className="flex w-full items-center gap-2 overflow-x-auto md:w-auto">
-            <Link
-              href={makeHref({ type: "ALL" })}
-              className={[
-                "whitespace-nowrap rounded-lg border px-4 py-2 text-sm font-medium",
-                type === "ALL"
-                  ? "border-blue-200 bg-blue-50 text-blue-700"
-                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
-              ].join(" ")}
-            >
-              Todos
-            </Link>
+          <div className="-mx-1 overflow-x-auto">
+            <div className="flex min-w-max items-center gap-2 px-1 lg:min-w-0">
+              <Link
+                href={makeHref({ type: "ALL" })}
+                className={[
+                  "whitespace-nowrap rounded-lg border px-4 py-2 text-sm font-medium",
+                  type === "ALL"
+                    ? "border-blue-200 bg-blue-50 text-blue-700"
+                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+                ].join(" ")}
+              >
+                Todos
+              </Link>
 
-            <Link
-              href={makeHref({ type: "RECURSOS_PROPRIOS" })}
-              className={[
-                "whitespace-nowrap rounded-lg border px-4 py-2 text-sm font-medium",
-                type === "RECURSOS_PROPRIOS"
-                  ? "border-blue-200 bg-blue-50 text-blue-700"
-                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
-              ].join(" ")}
-            >
-              Próprio
-            </Link>
+              <Link
+                href={makeHref({ type: "RECURSOS_PROPRIOS" })}
+                className={[
+                  "whitespace-nowrap rounded-lg border px-4 py-2 text-sm font-medium",
+                  type === "RECURSOS_PROPRIOS"
+                    ? "border-blue-200 bg-blue-50 text-blue-700"
+                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+                ].join(" ")}
+              >
+                Próprio
+              </Link>
 
-            <Link
-              href={makeHref({ type: "INCENTIVADO" })}
-              className={[
-                "whitespace-nowrap rounded-lg border px-4 py-2 text-sm font-medium",
-                type === "INCENTIVADO"
-                  ? "border-blue-200 bg-blue-50 text-blue-700"
-                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
-              ].join(" ")}
-            >
-              Incentivado
-            </Link>
+              <Link
+                href={makeHref({ type: "INCENTIVADO" })}
+                className={[
+                  "whitespace-nowrap rounded-lg border px-4 py-2 text-sm font-medium",
+                  type === "INCENTIVADO"
+                    ? "border-blue-200 bg-blue-50 text-blue-700"
+                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+                ].join(" ")}
+              >
+                Incentivado
+              </Link>
 
-            <Link
-              href={makeHref({ type: "RECURSOS_PUBLICOS" })}
-              className={[
-                "whitespace-nowrap rounded-lg border px-4 py-2 text-sm font-medium",
-                type === "RECURSOS_PUBLICOS"
-                  ? "border-blue-200 bg-blue-50 text-blue-700"
-                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
-              ].join(" ")}
-            >
-              Público
-            </Link>
+              <Link
+                href={makeHref({ type: "RECURSOS_PUBLICOS" })}
+                className={[
+                  "whitespace-nowrap rounded-lg border px-4 py-2 text-sm font-medium",
+                  type === "RECURSOS_PUBLICOS"
+                    ? "border-blue-200 bg-blue-50 text-blue-700"
+                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+                ].join(" ")}
+              >
+                Público
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -244,7 +248,63 @@ export default async function ProjectsPage({ searchParams }: Props) {
       </section>
 
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
+        {/* Mobile */}
+        <div className="divide-y divide-slate-200 md:hidden">
+          {(projects ?? []).map((p: any) => (
+            <div key={p.id} className="space-y-4 p-4">
+              <div className="min-w-0">
+                <Link
+                  href={`/dashboard/projects/${p.id}?tab=overview`}
+                  className="block break-words text-sm font-semibold text-slate-900 hover:underline"
+                >
+                  {p.title}
+                </Link>
+
+                <span className="mt-1 block break-all text-xs text-slate-500">
+                  ID: {p.id}
+                </span>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <span
+                  className={[
+                    "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium",
+                    badgeForType(p.project_type),
+                  ].join(" ")}
+                >
+                  {projectTypeLabel(String(p.project_type ?? ""))}
+                </span>
+
+                <span
+                  className={[
+                    "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium",
+                    badgeForStatus(p.status),
+                  ].join(" ")}
+                >
+                  {projectStatusLabel(p.status)}
+                </span>
+              </div>
+
+              <div className="flex">
+                <Link
+                  href={`/dashboard/projects/${p.id}?tab=overview`}
+                  className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-blue-600 transition hover:bg-slate-50"
+                >
+                  Abrir
+                </Link>
+              </div>
+            </div>
+          ))}
+
+          {(projects ?? []).length === 0 && (
+            <div className="px-4 py-12 text-center text-sm text-slate-500">
+              Nenhum projeto encontrado.
+            </div>
+          )}
+        </div>
+
+        {/* Desktop */}
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[860px] text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -259,7 +319,7 @@ export default async function ProjectsPage({ searchParams }: Props) {
               {(projects ?? []).map((p: any) => (
                 <tr key={p.id} className="hover:bg-slate-50">
                   <td className="px-6 py-4">
-                    <div className="flex flex-col">
+                    <div className="flex min-w-0 flex-col">
                       <Link
                         href={`/dashboard/projects/${p.id}?tab=overview`}
                         className="font-medium text-slate-900 hover:underline"
@@ -320,7 +380,7 @@ export default async function ProjectsPage({ searchParams }: Props) {
           </table>
         </div>
 
-        <div className="border-t border-slate-200 px-6 py-4 text-sm text-slate-500">
+        <div className="border-t border-slate-200 px-4 py-4 text-sm text-slate-500 sm:px-6">
           Mostrando{" "}
           <span className="font-medium text-slate-900">
             {(projects ?? []).length}
