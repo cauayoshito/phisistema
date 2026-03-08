@@ -65,6 +65,21 @@ function normalizeRole(value: unknown) {
     .toUpperCase();
 }
 
+function buildTabHref(
+  projectId: string,
+  tab: string,
+  success?: string | null,
+  error?: string | null
+) {
+  const params = new URLSearchParams();
+  params.set("tab", tab);
+
+  if (success) params.set("success", success);
+  if (error) params.set("error", error);
+
+  return `/dashboard/projects/${projectId}?${params.toString()}`;
+}
+
 export default async function DashboardProjectDetailPage({
   params,
   searchParams,
@@ -135,21 +150,25 @@ export default async function DashboardProjectDetailPage({
   const tab = searchParams?.tab ?? "overview";
 
   return (
-    <main className="mx-auto max-w-6xl p-6 space-y-6">
-      <header className="flex items-start justify-between">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-bold">{projectTitle}</h1>
+    <main className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-2">
+          <h1 className="break-words text-2xl font-bold text-slate-900 sm:text-3xl">
+            {projectTitle}
+          </h1>
 
-          <p className="text-sm text-slate-600">Tipo: {projectType}</p>
+          <p className="break-words text-sm text-slate-600">
+            Tipo: {String(projectType)}
+          </p>
 
-          <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-medium">
+          <span className="inline-flex w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
             {PROJECT_STATUS_LABEL[status]}
           </span>
         </div>
 
         <Link
           href="/dashboard/projects"
-          className="text-sm text-blue-600 hover:underline"
+          className="inline-flex min-h-10 items-center text-sm font-medium text-blue-600 hover:underline"
         >
           Voltar
         </Link>
@@ -167,38 +186,40 @@ export default async function DashboardProjectDetailPage({
         </div>
       )}
 
-      <section className="rounded-xl border bg-white p-4 space-y-3">
-        <h2 className="font-semibold">Fluxo de status</h2>
+      <section className="space-y-4 rounded-xl border bg-white p-4">
+        <h2 className="text-base font-semibold text-slate-900">
+          Fluxo de status
+        </h2>
 
         {canSubmit && (
-          <form action={changeProjectStatusAction}>
+          <form action={changeProjectStatusAction} className="w-full">
             <input type="hidden" name="project_id" value={project.id} />
             <input type="hidden" name="next_status" value="ENVIADO" />
 
-            <button className="rounded bg-emerald-600 px-4 py-2 text-white">
+            <button className="inline-flex min-h-11 w-full items-center justify-center rounded bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 sm:w-auto">
               Enviar para análise
             </button>
           </form>
         )}
 
         {canStartReview && (
-          <form action={changeProjectStatusAction}>
+          <form action={changeProjectStatusAction} className="w-full">
             <input type="hidden" name="project_id" value={project.id} />
             <input type="hidden" name="next_status" value="EM_ANALISE" />
 
-            <button className="rounded bg-amber-600 px-4 py-2 text-white">
+            <button className="inline-flex min-h-11 w-full items-center justify-center rounded bg-amber-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-700 sm:w-auto">
               Iniciar análise
             </button>
           </form>
         )}
 
         {canReview && (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <form action={changeProjectStatusAction}>
               <input type="hidden" name="project_id" value={project.id} />
               <input type="hidden" name="next_status" value="APROVADO" />
 
-              <button className="w-full rounded bg-emerald-600 px-4 py-2 text-white">
+              <button className="min-h-11 w-full rounded bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700">
                 Aprovar
               </button>
             </form>
@@ -210,11 +231,11 @@ export default async function DashboardProjectDetailPage({
               <input
                 name="reason"
                 placeholder="Motivo da devolução"
-                className="rounded border px-3 py-2"
+                className="min-h-11 rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:border-rose-400"
                 required
               />
 
-              <button className="rounded bg-rose-600 px-4 py-2 text-white">
+              <button className="min-h-11 rounded bg-rose-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-rose-700">
                 Devolver
               </button>
             </form>
@@ -222,94 +243,128 @@ export default async function DashboardProjectDetailPage({
         )}
 
         {canResubmit && (
-          <form action={changeProjectStatusAction}>
+          <form action={changeProjectStatusAction} className="w-full">
             <input type="hidden" name="project_id" value={project.id} />
             <input type="hidden" name="next_status" value="ENVIADO" />
 
-            <button className="rounded bg-blue-600 px-4 py-2 text-white">
+            <button className="inline-flex min-h-11 w-full items-center justify-center rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 sm:w-auto">
               Reenviar
             </button>
           </form>
         )}
       </section>
 
-      <nav className="flex gap-4 border-b pb-2 text-sm">
-        <Link
-          href="?tab=overview"
-          className={
-            tab === "overview" ? "font-semibold text-black" : "text-slate-500"
-          }
-        >
-          Overview
-        </Link>
+      <nav className="-mx-4 overflow-x-auto border-b px-4 sm:mx-0 sm:px-0">
+        <div className="flex min-w-max gap-4 pb-2 text-sm">
+          <Link
+            href={buildTabHref(
+              String(project.id),
+              "overview",
+              success,
+              errorMessage
+            )}
+            className={
+              tab === "overview"
+                ? "whitespace-nowrap font-semibold text-slate-900"
+                : "whitespace-nowrap text-slate-500 hover:text-slate-900"
+            }
+          >
+            Overview
+          </Link>
 
-        <Link
-          href="?tab=plan"
-          className={
-            tab === "plan" ? "font-semibold text-black" : "text-slate-500"
-          }
-        >
-          Plano
-        </Link>
+          <Link
+            href={buildTabHref(String(project.id), "plan", success, errorMessage)}
+            className={
+              tab === "plan"
+                ? "whitespace-nowrap font-semibold text-slate-900"
+                : "whitespace-nowrap text-slate-500 hover:text-slate-900"
+            }
+          >
+            Plano
+          </Link>
 
-        <Link
-          href="?tab=financial"
-          className={
-            tab === "financial" ? "font-semibold text-black" : "text-slate-500"
-          }
-        >
-          Financeiro
-        </Link>
+          <Link
+            href={buildTabHref(
+              String(project.id),
+              "financial",
+              success,
+              errorMessage
+            )}
+            className={
+              tab === "financial"
+                ? "whitespace-nowrap font-semibold text-slate-900"
+                : "whitespace-nowrap text-slate-500 hover:text-slate-900"
+            }
+          >
+            Financeiro
+          </Link>
 
-        <Link
-          href="?tab=documents"
-          className={
-            tab === "documents" ? "font-semibold text-black" : "text-slate-500"
-          }
-        >
-          Documentos
-        </Link>
+          <Link
+            href={buildTabHref(
+              String(project.id),
+              "documents",
+              success,
+              errorMessage
+            )}
+            className={
+              tab === "documents"
+                ? "whitespace-nowrap font-semibold text-slate-900"
+                : "whitespace-nowrap text-slate-500 hover:text-slate-900"
+            }
+          >
+            Documentos
+          </Link>
 
-        <Link
-          href="?tab=reports"
-          className={
-            tab === "reports" ? "font-semibold text-black" : "text-slate-500"
-          }
-        >
-          Relatórios
-        </Link>
+          <Link
+            href={buildTabHref(
+              String(project.id),
+              "reports",
+              success,
+              errorMessage
+            )}
+            className={
+              tab === "reports"
+                ? "whitespace-nowrap font-semibold text-slate-900"
+                : "whitespace-nowrap text-slate-500 hover:text-slate-900"
+            }
+          >
+            Relatórios
+          </Link>
+        </div>
       </nav>
 
-      {tab === "overview" && (
-        <div className="space-y-6">
-          <ProjectOverview project={project as any} />
+      <div className="min-w-0">
+        {tab === "overview" && (
+          <div className="space-y-6">
+            <ProjectOverview project={project as any} />
 
-          <ProjectParticipants
+            <ProjectParticipants
+              projectId={String(project.id)}
+              canManage={canManageParticipants}
+              organizationMembers={organizationMembers as any[]}
+              participants={participants as any[]}
+            />
+          </div>
+        )}
+
+        {tab === "plan" && <ProjectPlan project={project as any} />}
+
+        {tab === "financial" && <ProjectFinancial project={project as any} />}
+
+        {tab === "documents" && (
+          <ProjectDocuments
             projectId={String(project.id)}
-            canManage={canManageParticipants}
-            organizationMembers={organizationMembers as any[]}
-            participants={participants as any[]}
+            projectType={String(projectType)}
           />
-        </div>
-      )}
+        )}
 
-      {tab === "plan" && <ProjectPlan project={project as any} />}
-
-      {tab === "financial" && <ProjectFinancial project={project as any} />}
-
-      {tab === "documents" && (
-        <ProjectDocuments
-          projectId={String(project.id)}
-          projectType={String(projectType)}
-        />
-      )}
-
-      {tab === "reports" && (
-        <ProjectReports
-          projectId={String(project.id)}
-          reports={reports as any[]}
-        />
-      )}
+        {tab === "reports" && (
+          <ProjectReports
+            projectId={String(project.id)}
+            reports={reports as any[]}
+          />
+        )}
+      </div>
     </main>
   );
 }
