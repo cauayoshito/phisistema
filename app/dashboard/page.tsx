@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { requireUser } from "@/services/auth.service";
 import StatCard from "@/components/dashboard/StatCard";
 import {
@@ -100,10 +100,10 @@ export default async function DashboardPage() {
   const relatoriosTop = relatoriosRecentes.slice(0, 6);
 
   return (
-    <div className="space-y-8">
+    <div className="min-w-0 space-y-6 sm:space-y-8">
       <section className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
             Bem-vindo(a), {nome}!
           </h1>
           <p className="mt-1 text-sm text-slate-600">
@@ -111,24 +111,24 @@ export default async function DashboardPage() {
           </p>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
           <Link
             href="/dashboard/reports"
-            className="inline-flex items-center gap-2 rounded-lg border bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-50"
           >
             ⬇️ Ir para relatórios
           </Link>
 
           <Link
             href="/dashboard/projects/new"
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
           >
             ➕ Novo projeto
           </Link>
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <section className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total de projetos"
           value={totalProjetos}
@@ -159,10 +159,10 @@ export default async function DashboardPage() {
         />
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-3">
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <Link
           href="/dashboard/projects"
-          className="rounded-xl border bg-white p-4 hover:bg-slate-50"
+          className="rounded-xl border bg-white p-4 transition hover:bg-slate-50"
         >
           <h3 className="font-semibold text-slate-900">Projetos</h3>
           <p className="mt-1 text-sm text-slate-600">
@@ -172,7 +172,7 @@ export default async function DashboardPage() {
 
         <Link
           href="/dashboard/reports"
-          className="rounded-xl border bg-white p-4 hover:bg-slate-50"
+          className="rounded-xl border bg-white p-4 transition hover:bg-slate-50"
         >
           <h3 className="font-semibold text-slate-900">Relatórios</h3>
           <p className="mt-1 text-sm text-slate-600">
@@ -182,7 +182,7 @@ export default async function DashboardPage() {
 
         <Link
           href="/dashboard/organizations"
-          className="rounded-xl border bg-white p-4 hover:bg-slate-50"
+          className="rounded-xl border bg-white p-4 transition hover:bg-slate-50 sm:col-span-2 xl:col-span-1"
         >
           <h3 className="font-semibold text-slate-900">Organizações</h3>
           <p className="mt-1 text-sm text-slate-600">
@@ -192,7 +192,7 @@ export default async function DashboardPage() {
       </section>
 
       <section className="overflow-hidden rounded-xl border bg-white">
-        <div className="flex items-center justify-between border-b bg-slate-50 px-6 py-4">
+        <div className="flex flex-col gap-2 border-b bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <h3 className="text-sm font-semibold text-slate-900">
             Projetos recentes
           </h3>
@@ -204,8 +204,53 @@ export default async function DashboardPage() {
           </Link>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+        {/* Mobile */}
+        <div className="divide-y md:hidden">
+          {projetosTop.map((p) => {
+            const label =
+              p.title ?? p.name ?? p.project_name ?? "Projeto sem título";
+
+            return (
+              <div key={p.id} className="space-y-3 p-4">
+                <div className="min-w-0">
+                  <Link
+                    href={`/dashboard/projects/${p.id}?tab=overview`}
+                    className="block truncate text-sm font-semibold text-slate-900 hover:underline"
+                  >
+                    {label}
+                  </Link>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2 text-sm text-slate-600">
+                  <div>
+                    <span className="font-medium text-slate-800">Tipo: </span>
+                    {projectTypeLabel(p.project_type)}
+                  </div>
+                  <div>
+                    <span className="font-medium text-slate-800">Status: </span>
+                    {projectStatusLabel(p.status)}
+                  </div>
+                  <div>
+                    <span className="font-medium text-slate-800">
+                      Criado em:{" "}
+                    </span>
+                    {formatarData(p.created_at)}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {projetosTop.length === 0 && (
+            <div className="p-4 text-sm text-slate-500">
+              Nenhum projeto recente.
+            </div>
+          )}
+        </div>
+
+        {/* Desktop */}
+        <div className="hidden overflow-x-auto md:block">
+          <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="border-b text-xs uppercase text-slate-500">
               <tr>
                 <th className="px-6 py-3">Projeto</th>
@@ -255,7 +300,7 @@ export default async function DashboardPage() {
       </section>
 
       <section className="overflow-hidden rounded-xl border bg-white">
-        <div className="flex items-center justify-between border-b bg-slate-50 px-6 py-4">
+        <div className="flex flex-col gap-2 border-b bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <h3 className="text-sm font-semibold text-slate-900">
             Relatórios recentes
           </h3>
@@ -267,8 +312,48 @@ export default async function DashboardPage() {
           </Link>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+        {/* Mobile */}
+        <div className="divide-y md:hidden">
+          {relatoriosTop.map((r) => (
+            <div key={r.id} className="space-y-3 p-4">
+              <div className="min-w-0">
+                <Link
+                  href={`/dashboard/reports/${r.id}`}
+                  className="block truncate text-sm font-semibold text-blue-600 hover:underline"
+                >
+                  {r.title || "Sem título"}
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-1 gap-2 text-sm text-slate-600">
+                <div>
+                  <span className="font-medium text-slate-800">Status: </span>
+                  {reportStatusLabel(r.status)}
+                </div>
+                <div>
+                  <span className="font-medium text-slate-800">Criado em: </span>
+                  {formatarDataHora(r.created_at)}
+                </div>
+                <div className="min-w-0">
+                  <span className="font-medium text-slate-800">Projeto: </span>
+                  <span className="break-words">
+                    {r.project_label || "Projeto vinculado"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {relatoriosTop.length === 0 && (
+            <div className="p-4 text-sm text-slate-500">
+              Nenhum relatório recente.
+            </div>
+          )}
+        </div>
+
+        {/* Desktop */}
+        <div className="hidden overflow-x-auto md:block">
+          <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="border-b text-xs uppercase text-slate-500">
               <tr>
                 <th className="px-6 py-3">Relatório</th>
