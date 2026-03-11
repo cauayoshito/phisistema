@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { createReportAction } from "@/app/actions/report.actions";
 import { REPORT_STATUS_LABEL, type ReportStatus } from "@/lib/status";
 
@@ -46,7 +46,7 @@ export default function ProjectReports({ projectId, reports }: Props) {
   return (
     <section className="space-y-4">
       <div className="rounded-xl border bg-white p-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="font-semibold">Relatórios</h2>
           <Link
             href="/dashboard/reports"
@@ -116,56 +116,58 @@ export default function ProjectReports({ projectId, reports }: Props) {
       </div>
 
       <section className="overflow-hidden rounded-xl border bg-white">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50">
-            <tr>
-              <th className="px-4 py-3">Título</th>
-              <th className="px-4 py-3">Período</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Criado em</th>
-              <th className="px-4 py-3">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {reports.map((r: any) => (
-              <tr key={r.id} className="border-t">
-                <td className="px-4 py-3">
-                  {fallbackTitle(r.title, r.period_start, r.period_end)}
-                </td>
-
-                <td className="px-4 py-3">
-                  {formatDate(r.period_start)} → {formatDate(r.period_end)}
-                </td>
-
-                <td className="px-4 py-3">
-                  {REPORT_STATUS_LABEL[r.status as ReportStatus] ??
-                    String(r.status ?? "-")}
-                </td>
-
-                <td className="px-4 py-3">
-                  {String(r.created_at ?? "").slice(0, 19) || "-"}
-                </td>
-
-                <td className="px-4 py-3">
-                  <Link
-                    href={`/dashboard/reports/${r.id}`}
-                    className="text-blue-600 hover:underline"
-                  >
-                    Abrir
-                  </Link>
-                </td>
-              </tr>
-            ))}
-
-            {reports.length === 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-left text-sm">
+            <thead className="bg-slate-50">
               <tr>
-                <td colSpan={5} className="px-4 py-4 text-slate-500">
-                  Nenhum relatório ainda. Crie o primeiro acima.
-                </td>
+                <th className="px-4 py-3">Título</th>
+                <th className="px-4 py-3">Período</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Criado em</th>
+                <th className="px-4 py-3">Ações</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {reports.map((r: any) => (
+                <tr key={r.id} className="border-t">
+                  <td className="px-4 py-3">
+                    {fallbackTitle(r.title, r.period_start, r.period_end)}
+                  </td>
+
+                  <td className="px-4 py-3">
+                    {formatDate(r.period_start)} → {formatDate(r.period_end)}
+                  </td>
+
+                  <td className="px-4 py-3">
+                    {REPORT_STATUS_LABEL[r.status as ReportStatus] ??
+                      String(r.status ?? "-")}
+                  </td>
+
+                  <td className="px-4 py-3">
+                    {String(r.created_at ?? "").slice(0, 19) || "-"}
+                  </td>
+
+                  <td className="px-4 py-3">
+                    <Link
+                      href={`/dashboard/reports/${r.id}`}
+                      className="text-blue-600 hover:underline"
+                    >
+                      Abrir
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+
+              {reports.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-4 text-slate-500">
+                    Nenhum relatório ainda. Crie o primeiro acima.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
     </section>
   );

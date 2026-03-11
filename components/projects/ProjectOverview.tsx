@@ -1,5 +1,3 @@
-// components/projects/ProjectOverview.tsx
-
 import { PROJECT_STATUS_LABEL, type ProjectStatus } from "@/lib/status";
 
 type ProjectLike = {
@@ -18,10 +16,10 @@ type Props = {
 };
 
 function formatDate(value?: string | null) {
-  if (!value) return "—";
+  if (!value) return "-";
 
   const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "-";
 
   return new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "short",
@@ -29,7 +27,7 @@ function formatDate(value?: string | null) {
   }).format(d);
 }
 
-function fallback(v?: string | null, fb = "—") {
+function fallback(v?: string | null, fb = "-") {
   const s = String(v ?? "").trim();
   return s.length ? s : fb;
 }
@@ -67,20 +65,20 @@ export default function ProjectOverview({ project }: Props) {
 
   return (
     <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
+      <div className="border-b border-slate-200 bg-slate-50 px-4 py-4 sm:px-6">
         <h2 className="text-base font-semibold text-slate-900">Visão geral</h2>
         <p className="mt-1 text-sm text-slate-600">
           Informações principais do projeto.
         </p>
       </div>
 
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <div className="grid gap-4 md:grid-cols-2">
           <div className="rounded-lg border border-slate-200 bg-white p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Título
             </p>
-            <p className="mt-1 text-sm font-medium text-slate-900">
+            <p className="mt-1 break-words text-sm font-medium text-slate-900">
               {fallback(title)}
             </p>
           </div>
@@ -107,7 +105,7 @@ export default function ProjectOverview({ project }: Props) {
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Organização
             </p>
-            <p className="mt-1 text-sm font-medium text-slate-900">
+            <p className="mt-1 break-words text-sm font-medium text-slate-900">
               {organizationLabel(project.organization_id)}
             </p>
           </div>
@@ -130,11 +128,11 @@ export default function ProjectOverview({ project }: Props) {
             </p>
           </div>
 
-          <div className="md:col-span-2 rounded-lg border border-slate-200 bg-white p-4">
+          <div className="rounded-lg border border-slate-200 bg-white p-4 md:col-span-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Descrição
             </p>
-            <p className="mt-1 text-sm text-slate-700">
+            <p className="mt-1 break-words text-sm text-slate-700">
               {fallback(project.description, "Sem descrição.")}
             </p>
           </div>

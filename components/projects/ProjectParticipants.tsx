@@ -73,7 +73,7 @@ export default function ProjectParticipants({
   );
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold text-slate-900">
@@ -137,7 +137,7 @@ export default function ProjectParticipants({
           </div>
 
           {availableMembers.length === 0 ? (
-            <div className="md:col-span-3 text-sm text-slate-500">
+            <div className="text-sm text-slate-500 md:col-span-3">
               Todos os membros disponíveis da organização já foram adicionados a
               este projeto.
             </div>
@@ -156,16 +156,16 @@ export default function ProjectParticipants({
               key={participant.user_id}
               className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 px-4 py-3"
             >
-              <div className="min-w-0">
-                <div className="truncate text-sm font-medium text-slate-900">
+              <div className="min-w-0 flex-1">
+                <div className="break-words text-sm font-medium text-slate-900">
                   {participant.full_name ?? "Usuário sem nome"}
                 </div>
-                <div className="truncate text-xs text-slate-500">
+                <div className="break-all text-xs text-slate-500">
                   {participant.email ?? participant.user_id}
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto sm:justify-end">
                 <span
                   className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${participantRoleClass(
                     participant.role

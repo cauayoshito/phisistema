@@ -1,15 +1,20 @@
-import type { ReactNode } from "react";
+﻿import type { ReactNode } from "react";
 import Image from "next/image";
 import NavLink from "./NavLink";
 
 type Props = {
   footer?: ReactNode;
+  className?: string;
 };
 
-export default function Sidebar({ footer }: Props) {
+export default function Sidebar({ footer, className }: Props) {
   return (
-    <aside className="flex h-full min-h-0 w-72 max-w-full flex-shrink-0 flex-col bg-[#0f172a] text-slate-300">
-      {/* Brand */}
+    <aside
+      className={[
+        "flex h-full min-h-0 w-full max-w-full flex-shrink-0 flex-col bg-[#0f172a] text-slate-300",
+        className ?? "",
+      ].join(" ")}
+    >
       <div className="flex items-center gap-3 border-b border-slate-700/50 p-4 sm:p-5 lg:p-6">
         <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg bg-white/95 p-1 shadow-lg">
           <Image
@@ -32,7 +37,6 @@ export default function Sidebar({ footer }: Props) {
         </div>
       </div>
 
-      {/* Menu */}
       <nav className="flex-1 overflow-y-auto px-3 py-5 sm:py-6">
         <div className="flex min-h-0 flex-col gap-1">
           <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -62,11 +66,14 @@ export default function Sidebar({ footer }: Props) {
             Sistema
           </p>
 
-          <NavLink href="/dashboard/help" icon={<span>❓</span>} label="Ajuda" />
+          <NavLink
+            href="/dashboard/help"
+            icon={<span>❓</span>}
+            label="Ajuda"
+          />
         </div>
       </nav>
 
-      {/* Footer */}
       <div className="border-t border-slate-700/50 p-4">{footer}</div>
     </aside>
   );

@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { requireUser } from "@/services/auth.service";
 import StatCard from "@/components/dashboard/StatCard";
 import {
@@ -103,7 +103,7 @@ export default async function DashboardPage() {
     <div className="min-w-0 space-y-6 sm:space-y-8">
       <section className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
+          <h1 className="break-words text-2xl font-bold text-slate-900 sm:text-3xl">
             Bem-vindo(a), {nome}!
           </h1>
           <p className="mt-1 text-sm text-slate-600">
@@ -114,14 +114,14 @@ export default async function DashboardPage() {
         <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
           <Link
             href="/dashboard/reports"
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-50"
+            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-50 sm:w-auto"
           >
             ⬇️ Ir para relatórios
           </Link>
 
           <Link
             href="/dashboard/projects/new"
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 sm:w-auto"
           >
             ➕ Novo projeto
           </Link>
@@ -204,8 +204,7 @@ export default async function DashboardPage() {
           </Link>
         </div>
 
-        {/* Mobile */}
-        <div className="divide-y md:hidden">
+        <div className="divide-y divide-slate-200 md:hidden">
           {projetosTop.map((p) => {
             const label =
               p.title ?? p.name ?? p.project_name ?? "Projeto sem título";
@@ -215,7 +214,7 @@ export default async function DashboardPage() {
                 <div className="min-w-0">
                   <Link
                     href={`/dashboard/projects/${p.id}?tab=overview`}
-                    className="block truncate text-sm font-semibold text-slate-900 hover:underline"
+                    className="block break-words text-sm font-semibold text-slate-900 hover:underline"
                   >
                     {label}
                   </Link>
@@ -223,17 +222,17 @@ export default async function DashboardPage() {
 
                 <div className="grid grid-cols-1 gap-2 text-sm text-slate-600">
                   <div>
-                    <span className="font-medium text-slate-800">Tipo: </span>
+                    <span className="font-medium text-slate-900">Tipo:</span>{" "}
                     {projectTypeLabel(p.project_type)}
                   </div>
                   <div>
-                    <span className="font-medium text-slate-800">Status: </span>
+                    <span className="font-medium text-slate-900">Status:</span>{" "}
                     {projectStatusLabel(p.status)}
                   </div>
                   <div>
-                    <span className="font-medium text-slate-800">
-                      Criado em:{" "}
-                    </span>
+                    <span className="font-medium text-slate-900">
+                      Criado em:
+                    </span>{" "}
                     {formatarData(p.created_at)}
                   </div>
                 </div>
@@ -248,15 +247,14 @@ export default async function DashboardPage() {
           )}
         </div>
 
-        {/* Desktop */}
         <div className="hidden overflow-x-auto md:block">
-          <table className="w-full min-w-[640px] text-left text-sm">
+          <table className="w-full min-w-[680px] text-left text-sm">
             <thead className="border-b text-xs uppercase text-slate-500">
               <tr>
-                <th className="px-6 py-3">Projeto</th>
-                <th className="px-6 py-3">Tipo</th>
-                <th className="px-6 py-3">Status</th>
-                <th className="px-6 py-3">Criado em</th>
+                <th className="px-4 py-3 sm:px-6">Projeto</th>
+                <th className="px-4 py-3 sm:px-6">Tipo</th>
+                <th className="px-4 py-3 sm:px-6">Status</th>
+                <th className="px-4 py-3 sm:px-6">Criado em</th>
               </tr>
             </thead>
             <tbody>
@@ -266,7 +264,7 @@ export default async function DashboardPage() {
 
                 return (
                   <tr key={p.id} className="border-b last:border-0">
-                    <td className="px-6 py-4 font-medium text-slate-900">
+                    <td className="px-4 py-4 font-medium text-slate-900 sm:px-6">
                       <Link
                         href={`/dashboard/projects/${p.id}?tab=overview`}
                         className="hover:underline"
@@ -274,13 +272,13 @@ export default async function DashboardPage() {
                         {label}
                       </Link>
                     </td>
-                    <td className="px-6 py-4 text-slate-600">
+                    <td className="px-4 py-4 text-slate-600 sm:px-6">
                       {projectTypeLabel(p.project_type)}
                     </td>
-                    <td className="px-6 py-4 text-slate-600">
+                    <td className="px-4 py-4 text-slate-600 sm:px-6">
                       {projectStatusLabel(p.status)}
                     </td>
-                    <td className="px-6 py-4 text-slate-600">
+                    <td className="px-4 py-4 text-slate-600 sm:px-6">
                       {formatarData(p.created_at)}
                     </td>
                   </tr>
@@ -289,7 +287,7 @@ export default async function DashboardPage() {
 
               {projetosTop.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-6 py-6 text-slate-500">
+                  <td colSpan={4} className="px-4 py-6 text-slate-500 sm:px-6">
                     Nenhum projeto recente.
                   </td>
                 </tr>
@@ -312,14 +310,13 @@ export default async function DashboardPage() {
           </Link>
         </div>
 
-        {/* Mobile */}
-        <div className="divide-y md:hidden">
+        <div className="divide-y divide-slate-200 md:hidden">
           {relatoriosTop.map((r) => (
             <div key={r.id} className="space-y-3 p-4">
               <div className="min-w-0">
                 <Link
                   href={`/dashboard/reports/${r.id}`}
-                  className="block truncate text-sm font-semibold text-blue-600 hover:underline"
+                  className="block break-words text-sm font-semibold text-blue-600 hover:underline"
                 >
                   {r.title || "Sem título"}
                 </Link>
@@ -327,15 +324,15 @@ export default async function DashboardPage() {
 
               <div className="grid grid-cols-1 gap-2 text-sm text-slate-600">
                 <div>
-                  <span className="font-medium text-slate-800">Status: </span>
+                  <span className="font-medium text-slate-900">Status:</span>{" "}
                   {reportStatusLabel(r.status)}
                 </div>
                 <div>
-                  <span className="font-medium text-slate-800">Criado em: </span>
+                  <span className="font-medium text-slate-900">Criado em:</span>{" "}
                   {formatarDataHora(r.created_at)}
                 </div>
                 <div className="min-w-0">
-                  <span className="font-medium text-slate-800">Projeto: </span>
+                  <span className="font-medium text-slate-900">Projeto:</span>{" "}
                   <span className="break-words">
                     {r.project_label || "Projeto vinculado"}
                   </span>
@@ -351,21 +348,20 @@ export default async function DashboardPage() {
           )}
         </div>
 
-        {/* Desktop */}
         <div className="hidden overflow-x-auto md:block">
-          <table className="w-full min-w-[640px] text-left text-sm">
+          <table className="w-full min-w-[680px] text-left text-sm">
             <thead className="border-b text-xs uppercase text-slate-500">
               <tr>
-                <th className="px-6 py-3">Relatório</th>
-                <th className="px-6 py-3">Status</th>
-                <th className="px-6 py-3">Criado em</th>
-                <th className="px-6 py-3">Projeto</th>
+                <th className="px-4 py-3 sm:px-6">Relatório</th>
+                <th className="px-4 py-3 sm:px-6">Status</th>
+                <th className="px-4 py-3 sm:px-6">Criado em</th>
+                <th className="px-4 py-3 sm:px-6">Projeto</th>
               </tr>
             </thead>
             <tbody>
               {relatoriosTop.map((r) => (
                 <tr key={r.id} className="border-b last:border-0">
-                  <td className="px-6 py-4 font-medium text-slate-900">
+                  <td className="px-4 py-4 font-medium text-slate-900 sm:px-6">
                     <Link
                       href={`/dashboard/reports/${r.id}`}
                       className="text-blue-600 hover:underline"
@@ -373,13 +369,13 @@ export default async function DashboardPage() {
                       {r.title || "Sem título"}
                     </Link>
                   </td>
-                  <td className="px-6 py-4 text-slate-600">
+                  <td className="px-4 py-4 text-slate-600 sm:px-6">
                     {reportStatusLabel(r.status)}
                   </td>
-                  <td className="px-6 py-4 text-slate-600">
+                  <td className="px-4 py-4 text-slate-600 sm:px-6">
                     {formatarDataHora(r.created_at)}
                   </td>
-                  <td className="px-6 py-4 text-slate-600">
+                  <td className="px-4 py-4 text-slate-600 sm:px-6">
                     {r.project_label || "Projeto vinculado"}
                   </td>
                 </tr>
@@ -387,7 +383,7 @@ export default async function DashboardPage() {
 
               {relatoriosTop.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-6 py-6 text-slate-500">
+                  <td colSpan={4} className="px-4 py-6 text-slate-500 sm:px-6">
                     Nenhum relatório recente.
                   </td>
                 </tr>

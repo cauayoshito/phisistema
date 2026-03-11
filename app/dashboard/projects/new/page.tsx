@@ -269,10 +269,12 @@ export default async function NewProjectPage({ searchParams }: Props) {
     "";
 
   return (
-    <main className="mx-auto max-w-5xl p-6 space-y-6">
-      <header className="flex items-start justify-between gap-6">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-bold text-slate-900">Novo projeto</h1>
+    <main className="mx-auto max-w-5xl space-y-5 sm:space-y-6">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-1">
+          <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">
+            Novo projeto
+          </h1>
           <p className="text-sm text-slate-600">
             Escolha o modelo do projeto e crie a base inicial para preencher as
             abas de plano, financeiro, documentos e relatórios.
@@ -320,7 +322,7 @@ export default async function NewProjectPage({ searchParams }: Props) {
       </section>
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 p-5">
+        <div className="border-b border-slate-200 p-4 sm:p-5">
           <h2 className="text-base font-semibold text-slate-900">
             Dados iniciais do projeto
           </h2>
@@ -330,7 +332,7 @@ export default async function NewProjectPage({ searchParams }: Props) {
           </p>
         </div>
 
-        <form action={createProjectAction} className="space-y-6 p-5">
+        <form action={createProjectAction} className="space-y-6 p-4 sm:p-5">
           <div className="grid gap-5 md:grid-cols-2">
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-slate-700">
@@ -426,17 +428,17 @@ export default async function NewProjectPage({ searchParams }: Props) {
             conforme o modelo escolhido.
           </div>
 
-          <div className="flex items-center justify-end gap-3">
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
             <Link
               href="/dashboard/projects"
-              className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-center text-sm text-slate-700 hover:bg-slate-50 sm:w-auto"
             >
               Cancelar
             </Link>
 
             <button
               type="submit"
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+              className="w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 sm:w-auto"
               disabled={availableOrganizations.length === 0}
             >
               Criar projeto

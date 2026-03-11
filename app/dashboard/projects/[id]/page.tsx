@@ -148,6 +148,13 @@ export default async function DashboardProjectDetailPage({
   const success = readQueryValue(searchParams?.success);
 
   const tab = searchParams?.tab ?? "overview";
+  const tabs = [
+    { key: "overview", label: "Overview" },
+    { key: "plan", label: "Plano" },
+    { key: "financial", label: "Financeiro" },
+    { key: "documents", label: "Documentos" },
+    { key: "reports", label: "Relatórios" },
+  ];
 
   return (
     <main className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
@@ -256,80 +263,24 @@ export default async function DashboardProjectDetailPage({
 
       <nav className="-mx-4 overflow-x-auto border-b px-4 sm:mx-0 sm:px-0">
         <div className="flex min-w-max gap-4 pb-2 text-sm">
-          <Link
-            href={buildTabHref(
-              String(project.id),
-              "overview",
-              success,
-              errorMessage
-            )}
-            className={
-              tab === "overview"
-                ? "whitespace-nowrap font-semibold text-slate-900"
-                : "whitespace-nowrap text-slate-500 hover:text-slate-900"
-            }
-          >
-            Overview
-          </Link>
-
-          <Link
-            href={buildTabHref(String(project.id), "plan", success, errorMessage)}
-            className={
-              tab === "plan"
-                ? "whitespace-nowrap font-semibold text-slate-900"
-                : "whitespace-nowrap text-slate-500 hover:text-slate-900"
-            }
-          >
-            Plano
-          </Link>
-
-          <Link
-            href={buildTabHref(
-              String(project.id),
-              "financial",
-              success,
-              errorMessage
-            )}
-            className={
-              tab === "financial"
-                ? "whitespace-nowrap font-semibold text-slate-900"
-                : "whitespace-nowrap text-slate-500 hover:text-slate-900"
-            }
-          >
-            Financeiro
-          </Link>
-
-          <Link
-            href={buildTabHref(
-              String(project.id),
-              "documents",
-              success,
-              errorMessage
-            )}
-            className={
-              tab === "documents"
-                ? "whitespace-nowrap font-semibold text-slate-900"
-                : "whitespace-nowrap text-slate-500 hover:text-slate-900"
-            }
-          >
-            Documentos
-          </Link>
-
-          <Link
-            href={buildTabHref(
-              String(project.id),
-              "reports",
-              success,
-              errorMessage
-            )}
-            className={
-              tab === "reports"
-                ? "whitespace-nowrap font-semibold text-slate-900"
-                : "whitespace-nowrap text-slate-500 hover:text-slate-900"
-            }
-          >
-            Relatórios
-          </Link>
+          {tabs.map((item) => (
+            <Link
+              key={item.key}
+              href={buildTabHref(
+                String(project.id),
+                item.key,
+                success,
+                errorMessage
+              )}
+              className={
+                tab === item.key
+                  ? "whitespace-nowrap font-semibold text-slate-900"
+                  : "whitespace-nowrap text-slate-500 hover:text-slate-900"
+              }
+            >
+              {item.label}
+            </Link>
+          ))}
         </div>
       </nav>
 

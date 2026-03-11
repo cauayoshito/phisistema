@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
@@ -19,7 +19,7 @@ export default function DashboardLayout({ children }: Props) {
     if (mobileMenuOpen) {
       document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = previousOverflow || "";
+      document.body.style.overflow = "";
     }
 
     return () => {
@@ -43,7 +43,9 @@ export default function DashboardLayout({ children }: Props) {
       <div className="truncate text-sm font-semibold text-white">
         Transparência Social
       </div>
-      <div className="truncate text-xs text-slate-400">Ambiente autenticado</div>
+      <div className="truncate text-xs text-slate-400">
+        Ambiente autenticado
+      </div>
 
       <form action={signOutAction} className="mt-3">
         <button
@@ -63,22 +65,19 @@ export default function DashboardLayout({ children }: Props) {
   return (
     <div className="min-h-screen bg-slate-50 lg:h-screen lg:overflow-hidden">
       <div className="flex min-h-screen lg:h-screen">
-        {/* Sidebar desktop */}
         <aside className="hidden lg:flex lg:w-72 lg:shrink-0">
           <Sidebar footer={sidebarFooter} />
         </aside>
 
-        {/* Conteúdo */}
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <Topbar onOpenMenu={() => setMobileMenuOpen(true)} />
 
-          <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8">
+          <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8">
             <div className="min-w-0">{children}</div>
           </main>
         </div>
       </div>
 
-      {/* Overlay mobile */}
       {mobileMenuOpen && (
         <button
           type="button"
@@ -88,15 +87,14 @@ export default function DashboardLayout({ children }: Props) {
         />
       )}
 
-      {/* Drawer mobile */}
       <aside
         className={[
-          "fixed inset-y-0 left-0 z-50 w-[86vw] max-w-[320px] transform bg-[#0f172a] shadow-2xl transition-transform duration-200 ease-out lg:hidden",
+          "fixed inset-y-0 left-0 z-50 w-[86vw] max-w-[320px] transform transition-transform duration-200 ease-out lg:hidden",
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full",
         ].join(" ")}
         aria-hidden={!mobileMenuOpen}
       >
-        <div className="flex h-full min-h-0 flex-col">
+        <div className="flex h-full min-h-0 flex-col bg-[#0f172a] shadow-2xl">
           <div className="flex items-center justify-end border-b border-slate-700/50 p-3">
             <button
               type="button"

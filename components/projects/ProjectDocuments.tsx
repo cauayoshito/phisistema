@@ -10,7 +10,7 @@ import {
 
 type Props = {
   projectId: string;
-  projectType: string; // pode ser enum/string mesmo
+  projectType: string;
 };
 
 type DocRow = {
@@ -36,7 +36,7 @@ const DOC_TYPES = [
 ];
 
 function formatBytes(bytes?: number | null) {
-  if (!bytes || bytes <= 0) return "—";
+  if (!bytes || bytes <= 0) return "-";
   const units = ["B", "KB", "MB", "GB"];
   let b = bytes;
   let i = 0;
@@ -55,8 +55,6 @@ export default function ProjectDocuments({ projectId, projectType }: Props) {
   const [isPending, startTransition] = useTransition();
 
   const checklist = useMemo(() => {
-    // você pode sofisticar por projectType depois.
-    // por enquanto, mantém útil e "MVP completo".
     return ["Projeto/Proposta", "Orçamento", "Documentos da instituição"];
   }, []);
 
@@ -70,7 +68,7 @@ export default function ProjectDocuments({ projectId, projectType }: Props) {
   }
 
   useEffect(() => {
-    refresh();
+    void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
@@ -95,9 +93,8 @@ export default function ProjectDocuments({ projectId, projectType }: Props) {
         return;
       }
 
-      setMsg("Upload concluído ✅");
+      setMsg("Upload concluído.");
       setFile(null);
-      // limpa o input visualmente (hack simples)
       const input = document.getElementById(
         "project-doc-file"
       ) as HTMLInputElement | null;
@@ -147,17 +144,19 @@ export default function ProjectDocuments({ projectId, projectType }: Props) {
         return;
       }
 
-      setMsg("Removido ✅");
+      setMsg("Removido.");
       await refresh();
     });
   }
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border bg-white p-6">
-        <h3 className="text-lg font-semibold">Checklist de Documentos</h3>
+      <div className="rounded-xl border bg-white p-4 sm:p-6">
+        <h3 className="text-base font-semibold sm:text-lg">
+          Checklist de Documentos
+        </h3>
         <p className="text-sm text-slate-600">
-          Baseado no tipo do projeto: <b>{projectType || "—"}</b>
+          Baseado no tipo do projeto: <b>{projectType || "-"}</b>
         </p>
 
         <ul className="mt-4 list-disc space-y-1 pl-5 text-sm">
@@ -167,8 +166,8 @@ export default function ProjectDocuments({ projectId, projectType }: Props) {
         </ul>
       </div>
 
-      <div className="rounded-xl border bg-white p-6">
-        <h3 className="text-lg font-semibold">Uploads</h3>
+      <div className="rounded-xl border bg-white p-4 sm:p-6">
+        <h3 className="text-base font-semibold sm:text-lg">Uploads</h3>
 
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div>
@@ -199,12 +198,12 @@ export default function ProjectDocuments({ projectId, projectType }: Props) {
           </div>
         </div>
 
-        <div className="mt-4 flex items-center gap-3">
+        <div className="mt-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
           <button
             type="button"
             onClick={onUpload}
             disabled={isPending}
-            className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+            className="w-full rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-60 sm:w-auto"
           >
             {isPending ? "Enviando..." : "Enviar"}
           </button>
@@ -220,50 +219,104 @@ export default function ProjectDocuments({ projectId, projectType }: Props) {
               Nenhum arquivo enviado.
             </p>
           ) : (
-            <div className="mt-3 overflow-x-auto rounded-lg border">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 text-slate-700">
-                  <tr>
-                    <th className="px-3 py-2">Tipo</th>
-                    <th className="px-3 py-2">Arquivo</th>
-                    <th className="px-3 py-2">Tamanho</th>
-                    <th className="px-3 py-2">Enviado em</th>
-                    <th className="px-3 py-2 text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {docs.map((d) => (
-                    <tr key={d.id} className="border-t">
-                      <td className="px-3 py-2">{d.doc_type}</td>
-                      <td className="px-3 py-2">{d.file_name ?? "—"}</td>
-                      <td className="px-3 py-2">{formatBytes(d.size_bytes)}</td>
-                      <td className="px-3 py-2">
+            <div className="mt-3 overflow-hidden rounded-lg border">
+              <div className="divide-y divide-slate-200 md:hidden">
+                {docs.map((d) => (
+                  <div key={d.id} className="space-y-3 px-4 py-4">
+                    <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                      {d.doc_type}
+                    </span>
+
+                    <div className="grid gap-2 text-sm text-slate-600">
+                      <div className="break-all">
+                        <span className="font-medium text-slate-900">
+                          Arquivo:
+                        </span>{" "}
+                        {d.file_name ?? "-"}
+                      </div>
+                      <div>
+                        <span className="font-medium text-slate-900">
+                          Tamanho:
+                        </span>{" "}
+                        {formatBytes(d.size_bytes)}
+                      </div>
+                      <div>
+                        <span className="font-medium text-slate-900">
+                          Enviado em:
+                        </span>{" "}
                         {d.created_at
                           ? new Date(d.created_at).toLocaleString()
-                          : "—"}
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="flex justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => onOpen(d)}
-                            className="rounded-md border px-3 py-1 text-xs hover:bg-slate-50"
-                          >
-                            Abrir
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onDelete(d)}
-                            className="rounded-md border px-3 py-1 text-xs hover:bg-slate-50"
-                          >
-                            Remover
-                          </button>
-                        </div>
-                      </td>
+                          : "-"}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <button
+                        type="button"
+                        onClick={() => onOpen(d)}
+                        className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50"
+                      >
+                        Abrir
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDelete(d)}
+                        className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full min-w-[720px] text-left text-sm">
+                  <thead className="bg-slate-50 text-slate-700">
+                    <tr>
+                      <th className="px-3 py-2">Tipo</th>
+                      <th className="px-3 py-2">Arquivo</th>
+                      <th className="px-3 py-2">Tamanho</th>
+                      <th className="px-3 py-2">Enviado em</th>
+                      <th className="px-3 py-2 text-right">Ações</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {docs.map((d) => (
+                      <tr key={d.id} className="border-t">
+                        <td className="px-3 py-2">{d.doc_type}</td>
+                        <td className="px-3 py-2">{d.file_name ?? "-"}</td>
+                        <td className="px-3 py-2">
+                          {formatBytes(d.size_bytes)}
+                        </td>
+                        <td className="px-3 py-2">
+                          {d.created_at
+                            ? new Date(d.created_at).toLocaleString()
+                            : "-"}
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => onOpen(d)}
+                              className="rounded-md border px-3 py-1 text-xs hover:bg-slate-50"
+                            >
+                              Abrir
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onDelete(d)}
+                              className="rounded-md border px-3 py-1 text-xs hover:bg-slate-50"
+                            >
+                              Remover
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>

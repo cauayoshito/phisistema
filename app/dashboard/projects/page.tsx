@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { listProjectsForUser } from "@/services/projects.service";
@@ -165,11 +165,7 @@ export default async function ProjectsPage({ searchParams }: Props) {
 
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <form
-            className="w-full lg:w-96"
-            action={makeHref({})}
-            method="get"
-          >
+          <form className="w-full lg:w-96" action={makeHref({})} method="get">
             <input
               type="hidden"
               name="type"
@@ -248,7 +244,6 @@ export default async function ProjectsPage({ searchParams }: Props) {
       </section>
 
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        {/* Mobile */}
         <div className="divide-y divide-slate-200 md:hidden">
           {(projects ?? []).map((p: any) => (
             <div key={p.id} className="space-y-4 p-4">
@@ -303,22 +298,21 @@ export default async function ProjectsPage({ searchParams }: Props) {
           )}
         </div>
 
-        {/* Desktop */}
         <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[860px] text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                <th className="px-6 py-4">Nome do Projeto</th>
-                <th className="px-6 py-4">Tipo</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Ações</th>
+                <th className="px-4 py-4 sm:px-6">Nome do Projeto</th>
+                <th className="px-4 py-4 sm:px-6">Tipo</th>
+                <th className="px-4 py-4 sm:px-6">Status</th>
+                <th className="px-4 py-4 text-right sm:px-6">Ações</th>
               </tr>
             </thead>
 
             <tbody className="divide-y divide-slate-200">
               {(projects ?? []).map((p: any) => (
                 <tr key={p.id} className="hover:bg-slate-50">
-                  <td className="px-6 py-4">
+                  <td className="px-4 py-4 sm:px-6">
                     <div className="flex min-w-0 flex-col">
                       <Link
                         href={`/dashboard/projects/${p.id}?tab=overview`}
@@ -333,7 +327,7 @@ export default async function ProjectsPage({ searchParams }: Props) {
                     </div>
                   </td>
 
-                  <td className="px-6 py-4">
+                  <td className="px-4 py-4 sm:px-6">
                     <span
                       className={[
                         "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium",
@@ -344,7 +338,7 @@ export default async function ProjectsPage({ searchParams }: Props) {
                     </span>
                   </td>
 
-                  <td className="px-6 py-4">
+                  <td className="px-4 py-4 sm:px-6">
                     <span
                       className={[
                         "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium",
@@ -355,7 +349,7 @@ export default async function ProjectsPage({ searchParams }: Props) {
                     </span>
                   </td>
 
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-4 py-4 text-right sm:px-6">
                     <Link
                       href={`/dashboard/projects/${p.id}?tab=overview`}
                       className="text-blue-600 hover:underline"
@@ -370,7 +364,7 @@ export default async function ProjectsPage({ searchParams }: Props) {
                 <tr>
                   <td
                     colSpan={4}
-                    className="px-6 py-12 text-center text-slate-500"
+                    className="px-4 py-12 text-center text-slate-500 sm:px-6"
                   >
                     Nenhum projeto encontrado.
                   </td>

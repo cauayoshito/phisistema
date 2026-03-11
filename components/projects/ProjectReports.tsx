@@ -18,7 +18,7 @@ function fallbackTitle(
   end: string | null | undefined
 ) {
   if (title && title.trim()) return title;
-  return `Relatório ${formatDate(start)} → ${formatDate(end)}`;
+  return `Relatório ${formatDate(start)} -> ${formatDate(end)}`;
 }
 
 function getCurrentMonthRange() {
@@ -45,8 +45,8 @@ export default function ProjectReports({ projectId, reports }: Props) {
 
   return (
     <section className="space-y-4">
-      <div className="rounded-xl border bg-white p-4">
-        <div className="flex items-center justify-between">
+      <div className="rounded-xl border bg-white p-4 sm:p-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="font-semibold">Relatórios</h2>
           <Link
             href="/dashboard/reports"
@@ -58,11 +58,11 @@ export default function ProjectReports({ projectId, reports }: Props) {
 
         <form
           action={createReportAction}
-          className="mt-3 grid gap-3 sm:grid-cols-6"
+          className="mt-3 grid gap-3 md:grid-cols-6"
         >
           <input type="hidden" name="project_id" value={projectId} />
 
-          <div className="sm:col-span-3">
+          <div className="md:col-span-3">
             <label className="mb-1 block text-xs text-slate-600">
               Título (opcional)
             </label>
@@ -73,7 +73,7 @@ export default function ProjectReports({ projectId, reports }: Props) {
             />
           </div>
 
-          <div className="sm:col-span-1">
+          <div className="md:col-span-1">
             <label className="mb-1 block text-xs text-slate-600">Tipo</label>
             <select
               name="period_type"
@@ -84,7 +84,7 @@ export default function ProjectReports({ projectId, reports }: Props) {
             </select>
           </div>
 
-          <div className="sm:col-span-1">
+          <div className="md:col-span-1">
             <label className="mb-1 block text-xs text-slate-600">Início</label>
             <input
               name="period_start"
@@ -95,7 +95,7 @@ export default function ProjectReports({ projectId, reports }: Props) {
             />
           </div>
 
-          <div className="sm:col-span-1">
+          <div className="md:col-span-1">
             <label className="mb-1 block text-xs text-slate-600">Fim</label>
             <input
               name="period_end"
@@ -107,7 +107,7 @@ export default function ProjectReports({ projectId, reports }: Props) {
           </div>
 
           <button
-            className="rounded bg-blue-600 px-4 py-2 text-white sm:col-span-6"
+            className="w-full rounded bg-blue-600 px-4 py-2 text-white md:col-span-6"
             type="submit"
           >
             Criar relatório para este projeto
@@ -116,56 +116,101 @@ export default function ProjectReports({ projectId, reports }: Props) {
       </div>
 
       <section className="overflow-hidden rounded-xl border bg-white">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50">
-            <tr>
-              <th className="px-4 py-3">Título</th>
-              <th className="px-4 py-3">Período</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Criado em</th>
-              <th className="px-4 py-3">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {reports.map((r: any) => (
-              <tr key={r.id} className="border-t">
-                <td className="px-4 py-3">
-                  {fallbackTitle(r.title, r.period_start, r.period_end)}
-                </td>
+        <div className="divide-y divide-slate-200 md:hidden">
+          {reports.map((r: any) => (
+            <div key={r.id} className="space-y-3 px-4 py-4">
+              <div className="break-words text-sm font-medium text-slate-900">
+                {fallbackTitle(r.title, r.period_start, r.period_end)}
+              </div>
 
-                <td className="px-4 py-3">
-                  {formatDate(r.period_start)} → {formatDate(r.period_end)}
-                </td>
-
-                <td className="px-4 py-3">
+              <div className="grid gap-2 text-sm text-slate-600">
+                <div>
+                  <span className="font-medium text-slate-900">Período:</span>{" "}
+                  {formatDate(r.period_start)}
+                  {" -> "}
+                  {formatDate(r.period_end)}
+                </div>
+                <div>
+                  <span className="font-medium text-slate-900">Status:</span>{" "}
                   {REPORT_STATUS_LABEL[r.status as ReportStatus] ??
                     String(r.status ?? "-")}
-                </td>
-
-                <td className="px-4 py-3">
+                </div>
+                <div>
+                  <span className="font-medium text-slate-900">Criado em:</span>{" "}
                   {String(r.created_at ?? "").slice(0, 19) || "-"}
-                </td>
+                </div>
+              </div>
 
-                <td className="px-4 py-3">
-                  <Link
-                    href={`/dashboard/reports/${r.id}`}
-                    className="text-blue-600 hover:underline"
-                  >
-                    Abrir
-                  </Link>
-                </td>
-              </tr>
-            ))}
+              <Link
+                href={`/dashboard/reports/${r.id}`}
+                className="inline-flex w-full items-center justify-center rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Abrir
+              </Link>
+            </div>
+          ))}
 
-            {reports.length === 0 && (
+          {reports.length === 0 && (
+            <div className="px-4 py-4 text-sm text-slate-500">
+              Nenhum relatório ainda. Crie o primeiro acima.
+            </div>
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
+          <table className="w-full min-w-[640px] text-left text-sm">
+            <thead className="bg-slate-50">
               <tr>
-                <td colSpan={5} className="px-4 py-4 text-slate-500">
-                  Nenhum relatório ainda. Crie o primeiro acima.
-                </td>
+                <th className="px-4 py-3">Título</th>
+                <th className="px-4 py-3">Período</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Criado em</th>
+                <th className="px-4 py-3">Ações</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {reports.map((r: any) => (
+                <tr key={r.id} className="border-t">
+                  <td className="px-4 py-3">
+                    {fallbackTitle(r.title, r.period_start, r.period_end)}
+                  </td>
+
+                  <td className="px-4 py-3">
+                    {formatDate(r.period_start)}
+                    {" -> "}
+                    {formatDate(r.period_end)}
+                  </td>
+
+                  <td className="px-4 py-3">
+                    {REPORT_STATUS_LABEL[r.status as ReportStatus] ??
+                      String(r.status ?? "-")}
+                  </td>
+
+                  <td className="px-4 py-3">
+                    {String(r.created_at ?? "").slice(0, 19) || "-"}
+                  </td>
+
+                  <td className="px-4 py-3">
+                    <Link
+                      href={`/dashboard/reports/${r.id}`}
+                      className="text-blue-600 hover:underline"
+                    >
+                      Abrir
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+
+              {reports.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-4 text-slate-500">
+                    Nenhum relatório ainda. Crie o primeiro acima.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
     </section>
   );
