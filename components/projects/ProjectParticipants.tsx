@@ -80,7 +80,7 @@ export default function ProjectParticipants({
             Participantes do projeto
           </h2>
           <p className="mt-1 text-sm text-slate-600">
-            Defina quem acompanha este projeto e qual papel cada pessoa terá.
+            Defina quem acompanha este projeto e qual papel cada pessoa assume.
           </p>
         </div>
       </div>
@@ -138,8 +138,8 @@ export default function ProjectParticipants({
 
           {availableMembers.length === 0 ? (
             <div className="text-sm text-slate-500 md:col-span-3">
-              Todos os membros disponíveis da organização já foram adicionados a
-              este projeto.
+              Todos os membros disponíveis da organização já foram adicionados
+              a este projeto.
             </div>
           ) : null}
         </form>
@@ -148,7 +148,7 @@ export default function ProjectParticipants({
       <div className="mt-5 space-y-3">
         {participants.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
-            Nenhum participante encontrado para este projeto.
+            Nenhum participante foi adicionado a este projeto.
           </div>
         ) : (
           participants.map((participant) => (

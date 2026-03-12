@@ -27,8 +27,8 @@ export async function updateProjectFinancialAction(formData: FormData) {
 
   if (!projectId) {
     redirect(
-      `/dashboard/projects/new?error=${encodeURIComponent(
-        "project_id ausente"
+      `/dashboard/projects?error=${encodeURIComponent(
+        "Não foi possível identificar o projeto."
       )}`
     );
   }
@@ -50,7 +50,7 @@ export async function updateProjectFinancialAction(formData: FormData) {
     updated_at: new Date().toISOString(),
   };
 
-  const supabase = createClient();
+  const supabase = createClient() as any;
   await requireUser();
 
   const { error } = await supabase
@@ -61,13 +61,15 @@ export async function updateProjectFinancialAction(formData: FormData) {
   if (error) {
     redirect(
       `/dashboard/projects/${projectId}?tab=financial&error=${encodeURIComponent(
-        `Falha ao salvar financeiro: ${error.message}`
+        "Não foi possível salvar os dados financeiros."
       )}`
     );
   }
 
   revalidatePath(`/dashboard/projects/${projectId}`);
   redirect(
-    `/dashboard/projects/${projectId}?tab=financial&success=Financeiro%20salvo`
+    `/dashboard/projects/${projectId}?tab=financial&success=${encodeURIComponent(
+      "Dados financeiros salvos com sucesso."
+    )}`
   );
 }

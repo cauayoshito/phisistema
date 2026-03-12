@@ -7,6 +7,9 @@ type ProjectLike = {
   status?: string | null;
   project_type?: string | null;
   organization_id?: string | null;
+  linked_entity_id?: string | null;
+  linked_entity_name?: string | null;
+  linked_entity_type?: string | null;
   created_at?: string | null;
   description?: string | null;
 };
@@ -18,57 +21,67 @@ type Props = {
 function formatDate(value?: string | null) {
   if (!value) return "-";
 
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
 
   return new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "short",
     timeStyle: "medium",
-  }).format(d);
+  }).format(date);
 }
 
-function fallback(v?: string | null, fb = "-") {
-  const s = String(v ?? "").trim();
-  return s.length ? s : fb;
+function fallback(value?: string | null, fallbackValue = "-") {
+  const normalized = String(value ?? "").trim();
+  return normalized.length > 0 ? normalized : fallbackValue;
 }
 
 function projectStatusLabel(value?: string | null) {
   const key = String(value ?? "")
     .trim()
     .toUpperCase() as ProjectStatus;
+
   return PROJECT_STATUS_LABEL[key] ?? fallback(value);
 }
 
 function projectTypeLabel(value?: string | null) {
-  const v = String(value ?? "")
+  const normalized = String(value ?? "")
     .trim()
     .toUpperCase();
 
-  if (v === "RECURSOS_PROPRIOS") return "Recursos Próprios";
-  if (v === "RECURSOS_PUBLICOS") return "Recursos Públicos";
-  if (v === "INCENTIVADO") return "Incentivado";
-
+  if (normalized === "INCENTIVADO") return "Incentivos Fiscais";
+  if (normalized === "RECURSOS_PUBLICOS") return "Recursos Publicos";
+  if (normalized === "RECURSOS_PROPRIOS") return "Recursos Proprios";
   return fallback(value);
 }
 
-function organizationLabel(value?: string | null) {
-  const v = String(value ?? "").trim();
-  if (!v) return "Não vinculada";
+function organizationSummary(value?: string | null) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return "Nenhuma organizacao vinculada.";
+  return "Projeto vinculado a uma organizacao ativa no sistema.";
+}
 
-  if (v.length <= 12) return v;
+function linkedEntityTypeLabel(value?: string | null) {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
 
-  return `${v.slice(0, 8)}...${v.slice(-4)}`;
+  if (normalized === "empresa") return "Empresa";
+  if (normalized === "entidade_publica") return "Entidade publica";
+  return "Nao informado";
 }
 
 export default function ProjectOverview({ project }: Props) {
-  const title = project.title ?? project.name ?? "Projeto sem título";
+  const title = project.title ?? project.name ?? "Projeto sem titulo";
+  const hasStructuredEntityLink = Boolean(
+    String(project.linked_entity_id ?? "").trim()
+  );
 
   return (
     <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-200 bg-slate-50 px-4 py-4 sm:px-6">
-        <h2 className="text-base font-semibold text-slate-900">Visão geral</h2>
+        <h2 className="text-base font-semibold text-slate-900">Visao geral</h2>
         <p className="mt-1 text-sm text-slate-600">
-          Informações principais do projeto.
+          Informacoes principais para acompanhar este projeto.
         </p>
       </div>
 
@@ -76,7 +89,7 @@ export default function ProjectOverview({ project }: Props) {
         <div className="grid gap-4 md:grid-cols-2">
           <div className="rounded-lg border border-slate-200 bg-white p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Título
+              Titulo
             </p>
             <p className="mt-1 break-words text-sm font-medium text-slate-900">
               {fallback(title)}
@@ -103,14 +116,37 @@ export default function ProjectOverview({ project }: Props) {
 
           <div className="rounded-lg border border-slate-200 bg-white p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Organização
+              Vinculo institucional
             </p>
-            <p className="mt-1 break-words text-sm font-medium text-slate-900">
-              {organizationLabel(project.organization_id)}
+            <p className="mt-1 break-words text-sm text-slate-700">
+              {organizationSummary(project.organization_id)}
             </p>
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <div className="rounded-lg border border-slate-200 bg-white p-4 md:col-span-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Entidade vinculada
+            </p>
+            <p className="mt-1 break-words text-sm font-medium text-slate-900">
+              {fallback(
+                project.linked_entity_name,
+                "Nenhuma entidade vinculada foi informada para este projeto."
+              )}
+            </p>
+            <p className="mt-2 text-sm text-slate-600">
+              Tipo de vinculo:{" "}
+              <span className="font-medium text-slate-900">
+                {linkedEntityTypeLabel(project.linked_entity_type)}
+              </span>
+            </p>
+            <p className="mt-2 text-sm text-slate-600">
+              {hasStructuredEntityLink
+                ? "Esta entidade esta cadastrada na organizacao e vinculada formalmente a este projeto."
+                : "Este projeto mantem o vinculo registrado no momento da criacao."}
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-white p-4 md:col-span-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Criado em
             </p>
@@ -119,21 +155,15 @@ export default function ProjectOverview({ project }: Props) {
             </p>
           </div>
 
-          <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Identificador interno
-            </p>
-            <p className="mt-1 text-sm text-slate-600">
-              Registro interno do sistema.
-            </p>
-          </div>
-
           <div className="rounded-lg border border-slate-200 bg-white p-4 md:col-span-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Descrição
+              Resumo do projeto
             </p>
             <p className="mt-1 break-words text-sm text-slate-700">
-              {fallback(project.description, "Sem descrição.")}
+              {fallback(
+                project.description,
+                "Nenhum resumo foi informado para este projeto."
+              )}
             </p>
           </div>
         </div>

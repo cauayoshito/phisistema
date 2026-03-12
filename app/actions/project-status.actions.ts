@@ -10,15 +10,35 @@ function isProjectStatus(value: string): value is ProjectStatus {
   return (PROJECT_STATUS as readonly string[]).includes(value);
 }
 
+function redirectWithMessage(
+  projectId: string,
+  params: { success?: string; error?: string }
+): never {
+  const search = new URLSearchParams();
+
+  if (params.success) search.set("success", params.success);
+  if (params.error) search.set("error", params.error);
+
+  redirect(`/dashboard/projects/${projectId}?${search.toString()}`);
+}
+
 function getReason(nextStatus: ProjectStatus, formData: FormData): string | null {
   if (nextStatus === "DEVOLVIDO") {
     return readRequiredString(formData, "reason");
   }
 
-  if (nextStatus === "ENVIADO") return "envio via detalhes";
-  if (nextStatus === "EM_ANALISE") return "inicio analise via detalhes";
-  if (nextStatus === "APROVADO") return "aprovado via detalhes";
-  return "atualizacao via detalhes";
+  if (nextStatus === "ENVIADO") return "envio pela tela do projeto";
+  if (nextStatus === "EM_ANALISE") return "análise iniciada pela tela do projeto";
+  if (nextStatus === "APROVADO") return "aprovação pela tela do projeto";
+  return "atualização pela tela do projeto";
+}
+
+function successMessage(nextStatus: ProjectStatus): string {
+  if (nextStatus === "ENVIADO") return "Projeto enviado para análise.";
+  if (nextStatus === "EM_ANALISE") return "Análise iniciada com sucesso.";
+  if (nextStatus === "APROVADO") return "Projeto aprovado com sucesso.";
+  if (nextStatus === "DEVOLVIDO") return "Projeto devolvido para ajustes.";
+  return "Status do projeto atualizado com sucesso.";
 }
 
 export async function changeProjectStatusAction(formData: FormData) {
@@ -26,13 +46,13 @@ export async function changeProjectStatusAction(formData: FormData) {
   const nextStatusRaw = readRequiredString(formData, "next_status").toUpperCase();
 
   if (!isProjectStatus(nextStatusRaw)) {
-    redirect(
-      `/dashboard/projects/${projectId}?error=${encodeURIComponent("next_status invalido.")}`,
-    );
+    redirectWithMessage(projectId, {
+      error: "O status solicitado é inválido.",
+    });
   }
 
   const reason = getReason(nextStatusRaw, formData);
-  const supabase = createClient();
+  const supabase = createClient() as any;
 
   const { error } = await supabase.rpc("phi_set_project_status", {
     p_project_id: projectId,
@@ -41,11 +61,15 @@ export async function changeProjectStatusAction(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/dashboard/projects/${projectId}?error=${encodeURIComponent(error.message)}`);
+    redirectWithMessage(projectId, {
+      error: "Não foi possível atualizar o status do projeto.",
+    });
   }
 
   revalidatePath(`/dashboard/projects/${projectId}`);
   revalidatePath("/dashboard/projects");
-  redirect(`/dashboard/projects/${projectId}?success=1`);
+  redirectWithMessage(projectId, {
+    success: successMessage(nextStatusRaw),
+  });
 }
 

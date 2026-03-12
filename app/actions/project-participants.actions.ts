@@ -44,7 +44,7 @@ export async function addProjectParticipantAction(formData: FormData) {
 
   if (!participantUserId || !role) {
     redirectWithMessage(projectId, {
-      error: "Preencha o membro e o papel do participante.",
+      error: "Selecione o membro e o papel do participante.",
     });
   }
 
@@ -65,7 +65,7 @@ export async function addProjectParticipantAction(formData: FormData) {
 
     const memberships = await getOrganizationMemberships(safeUserId);
     const orgMembership = memberships.find(
-      (m) => m.organization_id === project.organization_id
+      (membership) => membership.organization_id === project.organization_id
     );
 
     if (!orgMembership) {
@@ -91,10 +91,7 @@ export async function addProjectParticipantAction(formData: FormData) {
     }
 
     redirectWithMessage(projectId, {
-      error:
-        error instanceof Error
-          ? error.message
-          : "Não foi possível adicionar o participante.",
+      error: "Não foi possível adicionar o participante.",
     });
   }
 }
@@ -127,7 +124,7 @@ export async function removeProjectParticipantAction(formData: FormData) {
 
     const memberships = await getOrganizationMemberships(safeUserId);
     const orgMembership = memberships.find(
-      (m) => m.organization_id === project.organization_id
+      (membership) => membership.organization_id === project.organization_id
     );
 
     if (!orgMembership) {
@@ -148,10 +145,7 @@ export async function removeProjectParticipantAction(formData: FormData) {
     }
 
     redirectWithMessage(projectId, {
-      error:
-        error instanceof Error
-          ? error.message
-          : "Não foi possível remover o participante.",
+      error: "Não foi possível remover o participante.",
     });
   }
 }

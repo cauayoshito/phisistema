@@ -29,8 +29,8 @@ type DocRow = {
 const DOC_TYPES = [
   { value: "CNPJ", label: "CNPJ" },
   { value: "ESTATUTO", label: "Estatuto Social" },
-  { value: "ATA_DIRETORIA", label: "Ata de eleição da diretoria" },
-  { value: "PROJETO_PROPOSTA", label: "Projeto/Proposta" },
+  { value: "ATA_DIRETORIA", label: "Ata da diretoria" },
+  { value: "PROJETO_PROPOSTA", label: "Projeto ou proposta" },
   { value: "ORCAMENTO", label: "Orçamento" },
   { value: "COMPROVANTE_BANCARIO", label: "Comprovantes bancários" },
 ];
@@ -47,16 +47,21 @@ function formatBytes(bytes?: number | null) {
   return `${b.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
-export default function ProjectDocuments({ projectId, projectType }: Props) {
+export default function ProjectDocuments({ projectId }: Props) {
   const [docs, setDocs] = useState<DocRow[]>([]);
   const [docType, setDocType] = useState<string>("CNPJ");
   const [file, setFile] = useState<File | null>(null);
   const [msg, setMsg] = useState<string>("");
   const [isPending, startTransition] = useTransition();
 
-  const checklist = useMemo(() => {
-    return ["Projeto/Proposta", "Orçamento", "Documentos da instituição"];
-  }, []);
+  const checklist = useMemo(
+    () => [
+      "Documentação institucional",
+      "Projeto ou proposta",
+      "Comprovantes e anexos financeiros",
+    ],
+    []
+  );
 
   async function refresh() {
     const res = await listProjectDocumentsAction(projectId);
@@ -93,7 +98,7 @@ export default function ProjectDocuments({ projectId, projectType }: Props) {
         return;
       }
 
-      setMsg("Upload concluído.");
+      setMsg("Arquivo enviado com sucesso.");
       setFile(null);
       const input = document.getElementById(
         "project-doc-file"
@@ -121,7 +126,7 @@ export default function ProjectDocuments({ projectId, projectType }: Props) {
 
       const url = res.data?.url;
       if (!url) {
-        setMsg("URL não retornada.");
+        setMsg("Não foi possível gerar o link do arquivo.");
         return;
       }
 
@@ -144,40 +149,49 @@ export default function ProjectDocuments({ projectId, projectType }: Props) {
         return;
       }
 
-      setMsg("Removido.");
+      setMsg("Arquivo removido.");
       await refresh();
     });
   }
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border bg-white p-4 sm:p-6">
-        <h3 className="text-base font-semibold sm:text-lg">
-          Checklist de Documentos
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <h3 className="text-base font-semibold text-slate-900 sm:text-lg">
+          Documentos do projeto
         </h3>
-        <p className="text-sm text-slate-600">
-          Baseado no tipo do projeto: <b>{projectType || "-"}</b>
+        <p className="mt-1 text-sm text-slate-600">
+          Use esta lista como referência geral para organizar os arquivos desta
+          etapa. Os documentos podem variar conforme o processo conduzido fora
+          desta tela.
         </p>
 
-        <ul className="mt-4 list-disc space-y-1 pl-5 text-sm">
+        <ul className="mt-4 list-disc space-y-1 pl-5 text-sm text-slate-700">
           {checklist.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
       </div>
 
-      <div className="rounded-xl border bg-white p-4 sm:p-6">
-        <h3 className="text-base font-semibold sm:text-lg">Uploads</h3>
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <div className="mb-4">
+          <h3 className="text-base font-semibold text-slate-900 sm:text-lg">
+            Envio de arquivos
+          </h3>
+          <p className="mt-1 text-sm text-slate-600">
+            Envie, abra e remova documentos sempre que precisar.
+          </p>
+        </div>
 
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium">
+            <label className="mb-1 block text-sm font-medium text-slate-700">
               Tipo do documento
             </label>
             <select
               value={docType}
               onChange={(e) => setDocType(e.target.value)}
-              className="w-full rounded-lg border px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
             >
               {DOC_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>
@@ -188,12 +202,14 @@ export default function ProjectDocuments({ projectId, projectType }: Props) {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium">Arquivo</label>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Arquivo
+            </label>
             <input
               id="project-doc-file"
               type="file"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              className="w-full rounded-lg border px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
             />
           </div>
         </div>
@@ -203,23 +219,25 @@ export default function ProjectDocuments({ projectId, projectType }: Props) {
             type="button"
             onClick={onUpload}
             disabled={isPending}
-            className="w-full rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-60 sm:w-auto"
+            className="w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60 sm:w-auto"
           >
-            {isPending ? "Enviando..." : "Enviar"}
+            {isPending ? "Enviando..." : "Enviar arquivo"}
           </button>
 
           {msg ? <span className="text-sm text-slate-700">{msg}</span> : null}
         </div>
 
         <div className="mt-6">
-          <h4 className="text-sm font-semibold">Arquivos enviados</h4>
+          <h4 className="text-sm font-semibold text-slate-900">
+            Arquivos enviados
+          </h4>
 
           {docs.length === 0 ? (
             <p className="mt-2 text-sm text-slate-600">
-              Nenhum arquivo enviado.
+              Nenhum arquivo enviado até agora.
             </p>
           ) : (
-            <div className="mt-3 overflow-hidden rounded-lg border">
+            <div className="mt-3 overflow-hidden rounded-lg border border-slate-200">
               <div className="divide-y divide-slate-200 md:hidden">
                 {docs.map((d) => (
                   <div key={d.id} className="space-y-3 px-4 py-4">
@@ -254,14 +272,14 @@ export default function ProjectDocuments({ projectId, projectType }: Props) {
                       <button
                         type="button"
                         onClick={() => onOpen(d)}
-                        className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50"
+                        className="rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50"
                       >
                         Abrir
                       </button>
                       <button
                         type="button"
                         onClick={() => onDelete(d)}
-                        className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50"
+                        className="rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50"
                       >
                         Remover
                       </button>
@@ -283,7 +301,7 @@ export default function ProjectDocuments({ projectId, projectType }: Props) {
                   </thead>
                   <tbody>
                     {docs.map((d) => (
-                      <tr key={d.id} className="border-t">
+                      <tr key={d.id} className="border-t border-slate-200">
                         <td className="px-3 py-2">{d.doc_type}</td>
                         <td className="px-3 py-2">{d.file_name ?? "-"}</td>
                         <td className="px-3 py-2">
@@ -299,14 +317,14 @@ export default function ProjectDocuments({ projectId, projectType }: Props) {
                             <button
                               type="button"
                               onClick={() => onOpen(d)}
-                              className="rounded-md border px-3 py-1 text-xs hover:bg-slate-50"
+                              className="rounded-md border border-slate-200 px-3 py-1 text-xs hover:bg-slate-50"
                             >
                               Abrir
                             </button>
                             <button
                               type="button"
                               onClick={() => onDelete(d)}
-                              className="rounded-md border px-3 py-1 text-xs hover:bg-slate-50"
+                              className="rounded-md border border-slate-200 px-3 py-1 text-xs hover:bg-slate-50"
                             >
                               Remover
                             </button>

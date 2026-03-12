@@ -31,10 +31,9 @@ function sanitizeFilename(name: string) {
 async function getProjectOrgId(projectId: string) {
   const supabase = createClient();
 
-  // garante sessão + usuário (seu requireUser NÃO recebe args)
   await requireUser();
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from("projects")
     .select("organization_id")
     .eq("id", projectId)
@@ -51,7 +50,6 @@ async function getProjectOrgId(projectId: string) {
 
 /**
  * LISTA documentos do projeto
- * (o ProjectDocuments.tsx provavelmente usa isso pra renderizar a lista)
  */
 export async function listProjectDocumentsAction(
   projectId: string
@@ -60,26 +58,34 @@ export async function listProjectDocumentsAction(
     const supabase = createClient();
     await requireUser();
 
-    if (!projectId) return { ok: false, error: "projectId ausente." };
+    if (!projectId) {
+      return { ok: false, error: "projectId ausente." };
+    }
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from("project_documents")
       .select(
-        "id, project_id, organization_id, uploaded_by, doc_type, file_name, mime_type, size_bytes, file_path, created_at"
+        "id, project_id, organization_id, uploaded_by, doc_type, file_name, mime_type, size_bytes, storage_path, created_at"
       )
       .eq("project_id", projectId)
       .order("created_at", { ascending: false });
 
-    if (error)
+    if (error) {
+      console.error("project_documents list error", error);
       return {
         ok: false,
-        error: "Falha ao listar documentos.",
+        error: `Falha ao listar documentos: ${error.message}`,
         details: error,
       };
+    }
 
     return { ok: true, data: { documents: data ?? [] } };
   } catch (e: any) {
-    return { ok: false, error: e?.message || "Erro desconhecido ao listar." };
+    console.error("project_documents list exception", e);
+    return {
+      ok: false,
+      error: e?.message || "Erro desconhecido ao listar.",
+    };
   }
 }
 
@@ -101,9 +107,17 @@ export async function uploadProjectDocumentAction(
     const docType = asString(formData.get("doc_type"));
     const fileEntry = formData.get("file");
 
-    if (!projectId) return { ok: false, error: "project_id ausente." };
-    if (!docType) return { ok: false, error: "doc_type ausente." };
-    if (!isFile(fileEntry)) return { ok: false, error: "Arquivo inválido." };
+    if (!projectId) {
+      return { ok: false, error: "project_id ausente." };
+    }
+
+    if (!docType) {
+      return { ok: false, error: "doc_type ausente." };
+    }
+
+    if (!isFile(fileEntry)) {
+      return { ok: false, error: "Arquivo inválido." };
+    }
 
     const orgId = await getProjectOrgId(projectId);
 
@@ -114,45 +128,52 @@ export async function uploadProjectDocumentAction(
     const arrayBuffer = await file.arrayBuffer();
     const bytes = new Uint8Array(arrayBuffer);
 
-    const filePath = `${orgId}/${projectId}/${docId}_${safeName}`;
+    const storagePath = `${orgId}/${projectId}/${docId}_${safeName}`;
 
     // 1) Storage upload
     const { error: uploadError } = await supabase.storage
       .from(BUCKET)
-      .upload(filePath, bytes, {
+      .upload(storagePath, bytes, {
         contentType: file.type || "application/octet-stream",
         upsert: false,
       });
 
     if (uploadError) {
+      console.error("project_documents storage upload error", uploadError);
       return {
         ok: false,
-        error: "Falha no upload (Storage).",
+        error: `Falha no upload (Storage): ${uploadError.message}`,
         details: uploadError,
       };
     }
 
     // 2) DB insert
-    const { error: insertError } = await supabase
+    const payload = {
+      id: docId,
+      project_id: projectId,
+      organization_id: orgId,
+      uploaded_by: user.id,
+      doc_type: docType,
+      file_name: safeName,
+      mime_type: file.type || null,
+      size_bytes: bytes.byteLength,
+      storage_path: storagePath,
+    };
+
+    console.error("project_documents payload", payload);
+
+    const { error: insertError } = await (supabase as any)
       .from("project_documents")
-      .insert({
-        id: docId,
-        project_id: projectId,
-        organization_id: orgId,
-        uploaded_by: user.id,
-        doc_type: docType,
-        file_name: safeName,
-        mime_type: file.type || null,
-        size_bytes: bytes.byteLength,
-        file_path: filePath,
-      });
+      .insert(payload);
 
     if (insertError) {
-      // rollback storage
-      await supabase.storage.from(BUCKET).remove([filePath]);
+      console.error("project_documents insert error", insertError);
+
+      await supabase.storage.from(BUCKET).remove([storagePath]);
+
       return {
         ok: false,
-        error: "Falha ao salvar documento (DB).",
+        error: `Falha ao salvar documento (DB): ${insertError.message}`,
         details: insertError,
       };
     }
@@ -160,7 +181,11 @@ export async function uploadProjectDocumentAction(
     revalidatePath(`/dashboard/projects/${projectId}`);
     return { ok: true };
   } catch (e: any) {
-    return { ok: false, error: e?.message || "Erro desconhecido no upload." };
+    console.error("project_documents upload exception", e);
+    return {
+      ok: false,
+      error: e?.message || "Erro desconhecido no upload.",
+    };
   }
 }
 
@@ -180,34 +205,46 @@ export async function getProjectDocumentSignedUrlAction(
     const projectId = asString(formData.get("project_id"));
     const documentId = asString(formData.get("document_id"));
 
-    if (!projectId) return { ok: false, error: "project_id ausente." };
-    if (!documentId) return { ok: false, error: "document_id ausente." };
+    if (!projectId) {
+      return { ok: false, error: "project_id ausente." };
+    }
 
-    const { data, error } = await supabase
+    if (!documentId) {
+      return { ok: false, error: "document_id ausente." };
+    }
+
+    const { data, error } = await (supabase as any)
       .from("project_documents")
-      .select("file_path")
+      .select("storage_path")
       .eq("id", documentId)
       .eq("project_id", projectId)
       .single();
 
-    if (error || !data?.file_path) {
-      return { ok: false, error: "Documento não encontrado.", details: error };
+    if (error || !data?.storage_path) {
+      console.error("project_documents signed url select error", error);
+      return {
+        ok: false,
+        error: error?.message || "Documento não encontrado.",
+        details: error,
+      };
     }
 
     const { data: signed, error: signError } = await supabase.storage
       .from(BUCKET)
-      .createSignedUrl(data.file_path, 120); // 2 min
+      .createSignedUrl(data.storage_path, 120);
 
     if (signError || !signed?.signedUrl) {
+      console.error("project_documents signed url error", signError);
       return {
         ok: false,
-        error: "Falha ao gerar link assinado.",
+        error: signError?.message || "Falha ao gerar link assinado.",
         details: signError,
       };
     }
 
     return { ok: true, data: { url: signed.signedUrl } };
   } catch (e: any) {
+    console.error("project_documents signed url exception", e);
     return {
       ok: false,
       error: e?.message || "Erro desconhecido ao gerar URL.",
@@ -231,50 +268,67 @@ export async function deleteProjectDocumentAction(
     const projectId = asString(formData.get("project_id"));
     const documentId = asString(formData.get("document_id"));
 
-    if (!projectId) return { ok: false, error: "project_id ausente." };
-    if (!documentId) return { ok: false, error: "document_id ausente." };
+    if (!projectId) {
+      return { ok: false, error: "project_id ausente." };
+    }
 
-    const { data: doc, error: selError } = await supabase
+    if (!documentId) {
+      return { ok: false, error: "document_id ausente." };
+    }
+
+    const { data: doc, error: selError } = await (supabase as any)
       .from("project_documents")
-      .select("id, file_path")
+      .select("id, storage_path")
       .eq("id", documentId)
       .eq("project_id", projectId)
       .single();
 
     if (selError || !doc?.id) {
+      console.error("project_documents delete select error", selError);
       return {
         ok: false,
-        error: "Documento não encontrado.",
+        error: selError?.message || "Documento não encontrado.",
         details: selError,
       };
     }
 
-    if (doc.file_path) {
+    if (doc.storage_path) {
       const { error: storageError } = await supabase.storage
         .from(BUCKET)
-        .remove([doc.file_path]);
+        .remove([doc.storage_path]);
+
       if (storageError) {
+        console.error("project_documents delete storage error", storageError);
         return {
           ok: false,
-          error: "Falha ao remover do Storage.",
+          error: `Falha ao remover do Storage: ${storageError.message}`,
           details: storageError,
         };
       }
     }
 
-    const { error: delError } = await supabase
+    const { error: delError } = await (supabase as any)
       .from("project_documents")
       .delete()
       .eq("id", documentId)
       .eq("project_id", projectId);
 
     if (delError) {
-      return { ok: false, error: "Falha ao remover do DB.", details: delError };
+      console.error("project_documents delete db error", delError);
+      return {
+        ok: false,
+        error: `Falha ao remover do DB: ${delError.message}`,
+        details: delError,
+      };
     }
 
     revalidatePath(`/dashboard/projects/${projectId}`);
     return { ok: true };
   } catch (e: any) {
-    return { ok: false, error: e?.message || "Erro desconhecido ao deletar." };
+    console.error("project_documents delete exception", e);
+    return {
+      ok: false,
+      error: e?.message || "Erro desconhecido ao deletar.",
+    };
   }
 }

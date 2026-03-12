@@ -15,9 +15,9 @@ function typeLabel(type?: string | null) {
     .toUpperCase()
     .trim();
   if (!v) return "-";
-  if (v === "RECURSOS_PROPRIOS") return "RECURSOS PRÓPRIOS";
-  if (v === "RECURSOS_PUBLICOS") return "RECURSOS PÚBLICOS";
-  if (v === "INCENTIVADO") return "INCENTIVADO";
+  if (v === "INCENTIVADO") return "Incentivos Fiscais";
+  if (v === "RECURSOS_PUBLICOS") return "Recursos Públicos";
+  if (v === "RECURSOS_PROPRIOS") return "Recursos Próprios";
   return v;
 }
 
@@ -31,17 +31,20 @@ export default function ProjectFinancial({ project }: Props) {
       <div className="border-b border-slate-200 bg-slate-50 px-4 py-4 sm:px-6">
         <h2 className="text-base font-semibold text-slate-900">Financeiro</h2>
         <p className="mt-1 text-sm text-slate-600">
-          MVP: valor total, captado e % (persistido em{" "}
-          <code className="font-mono">projects.financial_data</code>).
+          Informe os valores principais do projeto. O percentual de captação é
+          calculado automaticamente.
         </p>
       </div>
 
-      <form action={updateProjectFinancialAction} className="space-y-6 p-4 sm:p-6">
+      <form
+        action={updateProjectFinancialAction}
+        className="space-y-6 p-4 sm:p-6"
+      >
         <input type="hidden" name="project_id" value={project.id} />
 
-        <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
           Tipo do projeto:{" "}
-          <span className="font-semibold">
+          <span className="font-semibold text-slate-900">
             {typeLabel(project.project_type)}
           </span>
         </div>
@@ -75,7 +78,7 @@ export default function ProjectFinancial({ project }: Props) {
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700">
-              % captação
+              Percentual de captação
             </label>
             <input
               className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700"

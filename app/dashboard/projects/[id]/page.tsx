@@ -27,6 +27,16 @@ import ProjectParticipants from "@/components/projects/ProjectParticipants";
 
 export const dynamic = "force-dynamic";
 
+const tabs = [
+  { key: "overview", label: "Visão geral" },
+  { key: "plan", label: "Plano" },
+  { key: "financial", label: "Financeiro" },
+  { key: "documents", label: "Documentos" },
+  { key: "reports", label: "Relatórios" },
+] as const;
+
+type TabKey = (typeof tabs)[number]["key"];
+
 type Props = {
   params: { id: string };
   searchParams?: {
@@ -65,19 +75,58 @@ function normalizeRole(value: unknown) {
     .toUpperCase();
 }
 
-function buildTabHref(
-  projectId: string,
-  tab: string,
-  success?: string | null,
-  error?: string | null
+function isTabKey(value: string): value is TabKey {
+  return tabs.some((tab) => tab.key === value);
+}
+
+function readTab(value: string | string[] | undefined): TabKey {
+  const tab = readQueryValue(value);
+  return tab && isTabKey(tab) ? tab : "overview";
+}
+
+function buildTabHref(projectId: string, tab: TabKey) {
+  return `/dashboard/projects/${projectId}?tab=${tab}`;
+}
+
+function projectTypeLabel(value: unknown) {
+  const v = String(value ?? "")
+    .trim()
+    .toUpperCase();
+
+  if (v === "INCENTIVADO") return "Incentivos Fiscais";
+  if (v === "RECURSOS_PUBLICOS") return "Recursos Públicos";
+  if (v === "RECURSOS_PROPRIOS") return "Recursos Próprios";
+  return String(value ?? "-");
+}
+
+function buildStatusNote(
+  status: ProjectStatus,
+  isOrgUser: boolean,
+  consultant: boolean
 ) {
-  const params = new URLSearchParams();
-  params.set("tab", tab);
+  if (status === "APROVADO") {
+    return "Este projeto já foi aprovado. Nenhuma ação adicional está disponível nesta etapa.";
+  }
 
-  if (success) params.set("success", success);
-  if (error) params.set("error", error);
+  if (status === "DRAFT") {
+    return isOrgUser
+      ? "Revise as informações do projeto e envie para análise quando estiver pronto."
+      : "O projeto ainda está em rascunho e aguarda envio pela organização.";
+  }
 
-  return `/dashboard/projects/${projectId}?${params.toString()}`;
+  if (status === "ENVIADO") {
+    return consultant
+      ? "Este projeto está pronto para análise."
+      : "O projeto foi enviado e aguarda início da análise.";
+  }
+
+  if (status === "EM_ANALISE") {
+    return "O projeto está em análise no momento.";
+  }
+
+  return isOrgUser
+    ? "O projeto foi devolvido para ajustes. Revise as informações e reenvie quando estiver pronto."
+    : "O projeto foi devolvido para ajustes e aguarda atualização da organização.";
 }
 
 export default async function DashboardProjectDetailPage({
@@ -145,16 +194,11 @@ export default async function DashboardProjectDetailPage({
   const canManageParticipants = isProjectOwner || isOrgAdmin;
 
   const errorMessage = readQueryValue(searchParams?.error);
-  const success = readQueryValue(searchParams?.success);
-
-  const tab = searchParams?.tab ?? "overview";
-  const tabs = [
-    { key: "overview", label: "Overview" },
-    { key: "plan", label: "Plano" },
-    { key: "financial", label: "Financeiro" },
-    { key: "documents", label: "Documentos" },
-    { key: "reports", label: "Relatórios" },
-  ];
+  const successMessage = readQueryValue(searchParams?.success);
+  const tab = readTab(searchParams?.tab);
+  const hasStatusActions =
+    canSubmit || canStartReview || canReview || canResubmit;
+  const statusNote = buildStatusNote(status, isOrgUser, consultant);
 
   return (
     <main className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
@@ -165,7 +209,7 @@ export default async function DashboardProjectDetailPage({
           </h1>
 
           <p className="break-words text-sm text-slate-600">
-            Tipo: {String(projectType)}
+            Tipo: {projectTypeLabel(projectType)}
           </p>
 
           <span className="inline-flex w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
@@ -177,7 +221,7 @@ export default async function DashboardProjectDetailPage({
           href="/dashboard/projects"
           className="inline-flex min-h-10 items-center text-sm font-medium text-blue-600 hover:underline"
         >
-          Voltar
+          Voltar para projetos
         </Link>
       </header>
 
@@ -187,16 +231,20 @@ export default async function DashboardProjectDetailPage({
         </div>
       )}
 
-      {success && (
+      {successMessage && (
         <div className="rounded border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
-          {success}
+          {successMessage}
         </div>
       )}
 
       <section className="space-y-4 rounded-xl border bg-white p-4">
         <h2 className="text-base font-semibold text-slate-900">
-          Fluxo de status
+          Status do projeto
         </h2>
+        <p className="text-sm text-slate-600">
+          Acompanhe o andamento do projeto e execute as próximas ações quando
+          estiverem disponíveis.
+        </p>
 
         {canSubmit && (
           <form action={changeProjectStatusAction} className="w-full">
@@ -237,7 +285,7 @@ export default async function DashboardProjectDetailPage({
 
               <input
                 name="reason"
-                placeholder="Motivo da devolução"
+                placeholder="Explique o motivo da devolução"
                 className="min-h-11 rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:border-rose-400"
                 required
               />
@@ -259,6 +307,12 @@ export default async function DashboardProjectDetailPage({
             </button>
           </form>
         )}
+
+        {!hasStatusActions && (
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            {statusNote}
+          </div>
+        )}
       </section>
 
       <nav className="-mx-4 overflow-x-auto border-b px-4 sm:mx-0 sm:px-0">
@@ -266,12 +320,7 @@ export default async function DashboardProjectDetailPage({
           {tabs.map((item) => (
             <Link
               key={item.key}
-              href={buildTabHref(
-                String(project.id),
-                item.key,
-                success,
-                errorMessage
-              )}
+              href={buildTabHref(String(project.id), item.key)}
               className={
                 tab === item.key
                   ? "whitespace-nowrap font-semibold text-slate-900"

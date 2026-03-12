@@ -1,14 +1,14 @@
-﻿// app/actions/project.actions.ts
 "use server";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { isRedirectError } from "next/dist/client/components/redirect";
 import { requireUser } from "@/services/auth.service";
 import { logAction } from "@/services/audit.service";
 import { createProject } from "@/services/projects.service";
 
-function enc(v: string) {
-  return encodeURIComponent(v);
+function enc(value: string) {
+  return encodeURIComponent(value);
 }
 
 const ALLOWED_TYPES = new Set([
@@ -29,8 +29,7 @@ export async function createProjectAction(formData: FormData) {
       .trim()
       .toUpperCase();
     const descriptionRaw = String(formData.get("description") ?? "").trim();
-
-    // CHANGE: org determinística vinda do form
+    const linkedEntityId = String(formData.get("linked_entity_id") ?? "").trim();
     const organization_id =
       String(formData.get("organization_id") ?? "").trim() || undefined;
 
@@ -42,14 +41,22 @@ export async function createProjectAction(formData: FormData) {
 
     if (!ALLOWED_TYPES.has(projectType)) {
       redirect(
-        `/dashboard/projects/new?error=${enc("Tipo de projeto inválido.")}`
+        `/dashboard/projects/new?error=${enc("Tipo de projeto invalido.")}`
       );
     }
 
     if (!organization_id) {
       redirect(
         `/dashboard/projects/new?error=${enc(
-          "Sem organização selecionada/vinculada. Volte e selecione uma organização."
+          "Sem organizacao selecionada. Volte e escolha uma organizacao."
+        )}`
+      );
+    }
+
+    if (!linkedEntityId) {
+      redirect(
+        `/dashboard/projects/new?error=${enc(
+          "Selecione uma entidade cadastrada da organizacao."
         )}`
       );
     }
@@ -60,7 +67,8 @@ export async function createProjectAction(formData: FormData) {
         project_type: projectType,
         status,
         description: descriptionRaw || null,
-        organization_id, // CHANGE
+        organization_id,
+        linked_entity_id: linkedEntityId,
       },
       user.id
     );
@@ -69,14 +77,29 @@ export async function createProjectAction(formData: FormData) {
       "create_project",
       "project",
       project.id,
-      { title, project_type: projectType, status, organization_id },
+      {
+        title,
+        project_type: projectType,
+        status,
+        organization_id,
+        linked_entity_id: linkedEntityId,
+      },
       user.id
     );
 
     revalidatePath("/dashboard/projects");
+    revalidatePath("/dashboard/projects/new");
     redirect(`/dashboard/projects/${project.id}?tab=overview`);
-  } catch (e: any) {
-    const msg = e?.message ? String(e.message) : "Erro ao criar projeto.";
-    redirect(`/dashboard/projects/new?error=${enc(msg)}`);
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+
+    const message =
+      error instanceof Error && error.message
+        ? error.message
+        : "Nao foi possivel criar o projeto agora. Revise a entidade vinculada e tente novamente.";
+
+    redirect(`/dashboard/projects/new?error=${enc(message)}`);
   }
 }

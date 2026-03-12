@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { isRedirectError } from "next/dist/client/components/redirect";
+import NewProjectForm from "./NewProjectForm";
 import { requireUser } from "@/services/auth.service";
+import { listInstitutionalEntitiesForOrganizations } from "@/services/institutional-entities.service";
 import { getOrganizationMemberships } from "@/services/membership.service";
 import { createProject } from "@/services/projects.service";
 
@@ -18,35 +20,29 @@ function readQueryValue(value: string | string[] | undefined): string | null {
   return null;
 }
 
-function encodeMsg(msg: string) {
-  return encodeURIComponent(msg);
+function encodeMsg(message: string) {
+  return encodeURIComponent(message);
 }
 
 function normalizeProjectType(raw: string): ProjectType {
-  const v = String(raw ?? "")
+  const normalized = String(raw ?? "")
     .trim()
     .toUpperCase();
 
-  if (v === "INCENTIVADO") return "INCENTIVADO";
-  if (v === "RECURSOS_PUBLICOS") return "RECURSOS_PUBLICOS";
-  if (v === "RECURSOS_PROPRIOS") return "RECURSOS_PROPRIOS";
-
+  if (normalized === "INCENTIVADO") return "INCENTIVADO";
+  if (normalized === "RECURSOS_PUBLICOS") return "RECURSOS_PUBLICOS";
+  if (normalized === "RECURSOS_PROPRIOS") return "RECURSOS_PROPRIOS";
   return "INCENTIVADO";
 }
 
-function projectTypeLabel(type: ProjectType) {
-  if (type === "INCENTIVADO") return "Incentivado";
-  if (type === "RECURSOS_PUBLICOS") return "Recursos Públicos";
-  return "Recursos Próprios";
-}
-
 function roleLabel(value: string | null | undefined) {
-  const v = String(value ?? "")
+  const normalized = String(value ?? "")
     .trim()
     .toUpperCase();
-  if (v === "ORG_ADMIN") return "Administrador";
-  if (v === "ORG_MEMBER") return "Membro";
-  return "Vínculo";
+
+  if (normalized === "ORG_ADMIN") return "Administrador";
+  if (normalized === "ORG_MEMBER") return "Membro";
+  return "Vinculo";
 }
 
 function getInitialMetadataByProjectType(projectType: ProjectType) {
@@ -211,6 +207,7 @@ async function createProjectAction(formData: FormData) {
   );
   const description = String(formData.get("description") ?? "").trim();
   const organizationId = String(formData.get("organization_id") ?? "").trim();
+  const linkedEntityId = String(formData.get("linked_entity_id") ?? "").trim();
 
   if (!title) {
     redirect(
@@ -221,7 +218,15 @@ async function createProjectAction(formData: FormData) {
   if (!organizationId) {
     redirect(
       `/dashboard/projects/new?error=${encodeMsg(
-        "Selecione a organização do projeto."
+        "Voce precisa estar vinculado a uma organizacao para criar um projeto."
+      )}`
+    );
+  }
+
+  if (!linkedEntityId) {
+    redirect(
+      `/dashboard/projects/new?error=${encodeMsg(
+        "Selecione uma entidade cadastrada da organizacao."
       )}`
     );
   }
@@ -234,6 +239,7 @@ async function createProjectAction(formData: FormData) {
       description: description || null,
       project_type: projectType,
       organization_id: organizationId,
+      linked_entity_id: linkedEntityId,
       metadata: initialMetadata as any,
     });
 
@@ -243,13 +249,12 @@ async function createProjectAction(formData: FormData) {
       throw error;
     }
 
-    redirect(
-      `/dashboard/projects/new?error=${encodeMsg(
-        error instanceof Error
-          ? `Falha ao criar projeto: ${error.message}`
-          : "Falha ao criar projeto."
-      )}`
-    );
+    const message =
+      error instanceof Error && error.message
+        ? error.message
+        : "Nao foi possivel criar o projeto agora. Revise a entidade vinculada e tente novamente.";
+
+    redirect(`/dashboard/projects/new?error=${encodeMsg(message)}`);
   }
 }
 
@@ -258,15 +263,45 @@ export default async function NewProjectPage({ searchParams }: Props) {
   const memberships = await getOrganizationMemberships(user.id);
 
   const errorMessage = readQueryValue(searchParams?.error);
+  const availableOrganizations = memberships.filter((membership) =>
+    Boolean(membership.organization_id)
+  );
+  const hasOrganizations = availableOrganizations.length > 0;
+  const organizationIds = availableOrganizations
+    .map((membership) => membership.organization_id)
+    .filter(Boolean) as string[];
 
-  const availableOrganizations = memberships.filter((m) => !!m.organization_id);
+  const institutionalEntities =
+    organizationIds.length > 0
+      ? await listInstitutionalEntitiesForOrganizations(organizationIds)
+      : [];
+
+  const activeEntities = institutionalEntities.filter(
+    (entity) => String(entity.status ?? "").toUpperCase() === "ACTIVE"
+  );
+  const hasEntities = activeEntities.length > 0;
 
   const defaultOrgId =
     availableOrganizations.find(
-      (m) => String(m.role ?? "").toUpperCase() === "ORG_ADMIN"
+      (membership) => String(membership.role ?? "").toUpperCase() === "ORG_ADMIN"
     )?.organization_id ??
     availableOrganizations[0]?.organization_id ??
     "";
+
+  const organizationOptions = availableOrganizations.map((membership) => ({
+    id: membership.organization_id,
+    label:
+      (membership.organization?.name ?? "Organizacao sem nome") +
+      " - " +
+      roleLabel(membership.role),
+  }));
+
+  const entityOptions = activeEntities.map((entity) => ({
+    id: entity.id,
+    organization_id: entity.organization_id,
+    display_name: entity.display_name,
+    entity_type: entity.entity_type,
+  }));
 
   return (
     <main className="mx-auto max-w-5xl space-y-5 sm:space-y-6">
@@ -276,8 +311,8 @@ export default async function NewProjectPage({ searchParams }: Props) {
             Novo projeto
           </h1>
           <p className="text-sm text-slate-600">
-            Escolha o modelo do projeto e crie a base inicial para preencher as
-            abas de plano, financeiro, documentos e relatórios.
+            Escolha o modelo do projeto e selecione a entidade cadastrada que
+            ficara vinculada a ele desde a criacao.
           </p>
         </div>
 
@@ -295,157 +330,54 @@ export default async function NewProjectPage({ searchParams }: Props) {
         </div>
       )}
 
+      {!hasOrganizations && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          Voce ainda nao tem vinculo com uma organizacao. Peca acesso a um
+          administrador para poder criar projetos.
+        </div>
+      )}
+
+      {hasOrganizations && !hasEntities && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          Nenhuma empresa ou entidade publica foi cadastrada ainda para suas
+          organizacoes. Cadastre a primeira em{" "}
+          <Link href="/dashboard/entities" className="font-medium underline">
+            Entidades
+          </Link>{" "}
+          antes de criar um projeto.
+        </div>
+      )}
+
       <section className="grid gap-4 md:grid-cols-3">
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="font-semibold text-slate-900">Incentivado</h2>
+          <h2 className="font-semibold text-slate-900">Incentivos Fiscais</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Projetos com lei de incentivo, dados de aprovação, PRONAC,
-            contrapartidas e prestação com qualitativo, financeiro e fotos.
+            Projetos aprovados em uma das leis de incentivo fiscal.
           </p>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="font-semibold text-slate-900">Recursos Públicos</h2>
+          <h2 className="font-semibold text-slate-900">Recursos Publicos</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Projetos com edital, convênio ou termo, plano de trabalho, execução
-            financeira, extratos e prestação de contas por metas e despesas.
+            Projetos celebrados com o poder publico.
           </p>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="font-semibold text-slate-900">Recursos Próprios</h2>
+          <h2 className="font-semibold text-slate-900">Recursos Proprios</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Projetos com investimento próprio, plano de aplicação, documentação
-            institucional e prestação com metas, qualitativo e financeiro.
+            Projetos que buscam apoio financeiro de empresas.
           </p>
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 p-4 sm:p-5">
-          <h2 className="text-base font-semibold text-slate-900">
-            Dados iniciais do projeto
-          </h2>
-          <p className="mt-1 text-sm text-slate-600">
-            O sistema cria o projeto já com a estrutura base do modelo
-            selecionado para acelerar o preenchimento da Fase 1.
-          </p>
-        </div>
-
-        <form action={createProjectAction} className="space-y-6 p-4 sm:p-5">
-          <div className="grid gap-5 md:grid-cols-2">
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-slate-700">
-                Nome do projeto
-              </label>
-              <input
-                name="title"
-                placeholder="Ex: Educação no trânsito também é coisa de criança!"
-                className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700">
-                Organização
-              </label>
-              <select
-                name="organization_id"
-                defaultValue={defaultOrgId}
-                className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-                required
-              >
-                {availableOrganizations.length === 0 ? (
-                  <option value="">Nenhuma organização disponível</option>
-                ) : (
-                  availableOrganizations.map((membership) => (
-                    <option
-                      key={membership.organization_id}
-                      value={membership.organization_id}
-                    >
-                      {(membership.organization?.name ??
-                        "Organização sem nome") +
-                        " • " +
-                        roleLabel(membership.role)}
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700">
-                Modelo do projeto
-              </label>
-              <select
-                name="project_type"
-                defaultValue="INCENTIVADO"
-                className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-              >
-                <option value="INCENTIVADO">
-                  {projectTypeLabel("INCENTIVADO")}
-                </option>
-                <option value="RECURSOS_PUBLICOS">
-                  {projectTypeLabel("RECURSOS_PUBLICOS")}
-                </option>
-                <option value="RECURSOS_PROPRIOS">
-                  {projectTypeLabel("RECURSOS_PROPRIOS")}
-                </option>
-              </select>
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-slate-700">
-                Status inicial
-              </label>
-              <input
-                value="Rascunho"
-                readOnly
-                className="mt-2 w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-600"
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-slate-700">
-                Descrição inicial (opcional)
-              </label>
-              <textarea
-                name="description"
-                rows={4}
-                className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-                placeholder="Observações iniciais, resumo do projeto ou contexto do cadastro..."
-              />
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-            Ao criar o projeto, o sistema já inicia a estrutura-base de{" "}
-            <span className="font-medium">
-              identificação, metas, cronograma, financeiro, documentos e
-              prestação de contas
-            </span>{" "}
-            conforme o modelo escolhido.
-          </div>
-
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
-            <Link
-              href="/dashboard/projects"
-              className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-center text-sm text-slate-700 hover:bg-slate-50 sm:w-auto"
-            >
-              Cancelar
-            </Link>
-
-            <button
-              type="submit"
-              className="w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 sm:w-auto"
-              disabled={availableOrganizations.length === 0}
-            >
-              Criar projeto
-            </button>
-          </div>
-        </form>
-      </section>
+      <NewProjectForm
+        action={createProjectAction}
+        organizations={organizationOptions}
+        entities={entityOptions}
+        defaultOrganizationId={defaultOrgId}
+        canSubmit={hasOrganizations && hasEntities}
+      />
     </main>
   );
 }

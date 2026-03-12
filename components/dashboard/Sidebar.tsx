@@ -50,6 +50,11 @@ export default function Sidebar({ footer, className }: Props) {
             label="Projetos"
           />
           <NavLink
+            href="/dashboard/entities"
+            icon={<span>🏛️</span>}
+            label="Entidades"
+          />
+          <NavLink
             href="/dashboard/reports"
             icon={<span>📄</span>}
             label="Relatórios"

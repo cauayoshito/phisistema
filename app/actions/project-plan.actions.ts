@@ -1,51 +1,67 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-
-type Result = { ok: true } | { ok: false; error: string; details?: unknown };
+import { buildProjectPlanData } from "@/lib/project-plan";
 
 function asString(v: FormDataEntryValue | null): string {
   return typeof v === "string" ? v : "";
 }
 
-export async function saveProjectPlanAction(
-  formData: FormData
-): Promise<Result> {
-  try {
-    const supabase = createClient();
+function goToProjectTab(projectId: string, params: Record<string, string>) {
+  const search = new URLSearchParams({ tab: "plan", ...params });
+  redirect(`/dashboard/projects/${projectId}?${search.toString()}`);
+}
 
-    const {
-      data: { user },
-      error: userErr,
-    } = await supabase.auth.getUser();
+export async function saveProjectPlanAction(formData: FormData) {
+  const supabase = createClient() as any;
 
-    if (userErr)
-      return { ok: false, error: "Falha ao ler sessão.", details: userErr };
-    if (!user) return { ok: false, error: "Não autenticado." };
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
 
-    const projectId = asString(formData.get("project_id")).trim();
-    const objective = asString(formData.get("objective")).trim();
-
-    if (!projectId) return { ok: false, error: "project_id é obrigatório." };
-
-    // Ajuste aqui conforme seu modelo (jsonb)
-    const planData = {
-      objective_general: objective,
-      updated_at: new Date().toISOString(),
-    };
-
-    const { error } = await supabase
-      .from("projects")
-      .update({ plan_data: planData })
-      .eq("id", projectId);
-
-    if (error)
-      return { ok: false, error: "Falha ao salvar plano.", details: error };
-
-    revalidatePath(`/dashboard/projects/${projectId}?tab=plan`);
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: "Erro inesperado.", details: e };
+  if (userError || !user) {
+    redirect("/login");
   }
+
+  const projectId = asString(formData.get("project_id")).trim();
+  const objective = asString(formData.get("objective")).trim();
+
+  if (!projectId) {
+    redirect(
+      `/dashboard/projects?error=${encodeURIComponent(
+        "Não foi possível identificar o projeto."
+      )}`
+    );
+  }
+
+  const { data: project, error: projectError } = await supabase
+    .from("projects")
+    .select("plan_data")
+    .eq("id", projectId)
+    .single();
+
+  if (projectError) {
+    goToProjectTab(projectId, {
+      error: "Não foi possível carregar o plano atual do projeto.",
+    });
+  }
+
+  const planData = buildProjectPlanData(project?.plan_data, objective);
+
+  const { error: updateError } = await supabase
+    .from("projects")
+    .update({ plan_data: planData })
+    .eq("id", projectId);
+
+  if (updateError) {
+    goToProjectTab(projectId, {
+      error: "Não foi possível salvar o plano do projeto.",
+    });
+  }
+
+  revalidatePath(`/dashboard/projects/${projectId}`);
+  goToProjectTab(projectId, { success: "Plano salvo com sucesso." });
 }

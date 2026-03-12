@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getInstitutionalEntityByIdForOrganization } from "@/services/institutional-entities.service";
 import { getOrganizationMemberships } from "@/services/membership.service";
 import type { Database, Json } from "@/types/database";
 
@@ -25,6 +26,7 @@ export type CreateProjectInput = {
   project_type: string;
   status?: string;
   organization_id?: string;
+  linked_entity_id: string;
   metadata?: Json;
 };
 
@@ -33,7 +35,7 @@ function normalizeRole(role: string | null | undefined): string {
 }
 
 function serviceError(base: string, raw: unknown, context: string) {
-  const anyRaw = raw as any;
+  const anyRaw = raw as { message?: string } | null;
   const msg =
     raw instanceof Error
       ? raw.message
@@ -89,7 +91,7 @@ export async function listProjectsForUser(
 
   if (membershipRes.error) {
     throw serviceError(
-      "Falha ao buscar participações do projeto",
+      "Falha ao buscar participacoes do projeto",
       membershipRes.error,
       "project_memberships.select"
     );
@@ -166,36 +168,69 @@ export async function createProject(
 
   if (authError || !user) {
     throw serviceError(
-      "Usuário não autenticado",
+      "Usuario nao autenticado",
       authError ?? "Sem user",
       "auth.getUser()"
     );
   }
 
   const effectiveUserId = userId ?? user.id;
-
   let organizationId = payload.organization_id?.trim() || null;
 
   if (!organizationId) {
     const memberships = await getOrganizationMemberships(effectiveUserId);
     const orgAdminMembership = memberships.find(
-      (m) => normalizeRole(m.role) === "ORG_ADMIN"
+      (membership) => normalizeRole(membership.role) === "ORG_ADMIN"
     );
     organizationId = orgAdminMembership?.organization_id ?? null;
   }
 
   if (!organizationId) {
-    throw new Error("Não foi possível determinar a organização do projeto.");
+    throw new Error("Nao foi possivel determinar a organizacao do projeto.");
+  }
+
+  const linkedEntityId = String(payload.linked_entity_id ?? "").trim();
+
+  if (!linkedEntityId) {
+    throw new Error("Selecione uma entidade cadastrada para criar o projeto.");
+  }
+
+  const linkedEntity = await getInstitutionalEntityByIdForOrganization(
+    linkedEntityId,
+    organizationId
+  );
+
+  if (!linkedEntity) {
+    throw new Error(
+      "Selecione uma entidade cadastrada da organizacao para continuar."
+    );
+  }
+
+  if (String(linkedEntity.status ?? "").toUpperCase() !== "ACTIVE") {
+    throw new Error("A entidade selecionada nao esta ativa para novos projetos.");
+  }
+
+  const linkedEntityName = String(linkedEntity.display_name ?? "").trim();
+  const linkedEntityType = String(linkedEntity.entity_type ?? "")
+    .trim()
+    .toLowerCase();
+
+  if (!linkedEntityName || !linkedEntityType) {
+    throw new Error(
+      "A entidade selecionada nao possui dados suficientes para vincular o projeto."
+    );
   }
 
   const rpcResponse = await supabase.rpc(
     "create_project_secure" as never,
     {
-      p_title: payload.title,
+      p_name: payload.title,
       p_description: payload.description ?? null,
       p_project_type: payload.project_type,
       p_organization_id: organizationId,
-      p_metadata: (payload.metadata ?? {}) as never,
+      p_linked_entity_id: linkedEntity.id,
+      p_linked_entity_name: linkedEntityName,
+      p_linked_entity_type: linkedEntityType,
     } as never
   );
 
@@ -203,6 +238,7 @@ export async function createProject(
   const data = rpcResponse.data as ProjectRow | null;
 
   if (error) {
+    console.error("create_project_secure rpc error", error);
     throw serviceError(
       "Falha ao criar projeto",
       error,
@@ -212,9 +248,16 @@ export async function createProject(
 
   if (!data?.id) {
     throw new Error(
-      "A função create_project_secure não retornou um projeto válido."
+      "A funcao create_project_secure nao retornou um projeto valido."
     );
   }
+
+  await upsertProjectMembership({
+    project_id: data.id,
+    user_id: effectiveUserId,
+    role: "OWNER",
+    created_by: effectiveUserId,
+  });
 
   return data;
 }
@@ -303,7 +346,7 @@ export async function listProjectParticipants(
   const memberships = membershipRes.data ?? [];
   if (memberships.length === 0) return [];
 
-  const userIds = memberships.map((m) => m.user_id);
+  const userIds = memberships.map((membership) => membership.user_id);
 
   const profilesRes = await supabase
     .schema("public")
@@ -374,9 +417,7 @@ export async function removeProjectParticipant(
   if (!currentRes.data) return;
 
   if (String(currentRes.data.role).toUpperCase() === "OWNER") {
-    throw new Error(
-      "O criador do projeto não pode ser removido dos participantes."
-    );
+    throw new Error("O criador do projeto nao pode ser removido dos participantes.");
   }
 
   const { error } = await supabase
