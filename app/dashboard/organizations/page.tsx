@@ -4,6 +4,7 @@ import { getUserContext } from "@/services/membership.service";
 import { getOrganizationMemberships } from "@/services/membership.service";
 import { listOrganizationsForUser } from "@/services/organizations.service";
 import { getPrimaryRole } from "@/lib/roles";
+import { createOrgInviteAction } from "@/app/actions/org-invite.actions";
 
 export const dynamic = "force-dynamic";
 
@@ -94,56 +95,114 @@ export default async function DashboardOrganizationsPage({
         </div>
       )}
 
-      {/* ── INVESTOR: vê organizações vinculadas, não cria ── */}
-      {role === "INVESTOR" && (
-        <>
-          {orgs.length === 0 ? (
-            <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-slate-900">
-                Nenhuma organização vinculada
-              </h2>
-              <p className="mt-2 text-sm text-slate-600">
-                Você ainda não tem organizações sociais vinculadas ao seu perfil.
-                Use o sistema de convites para vincular organizações aos seus projetos.
-              </p>
-            </section>
-          ) : (
-            <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-              <div className="border-b border-slate-200 px-5 py-4">
+      {/* ── INVESTOR: orgs vinculadas + convidar novas ── */}
+      {role === "INVESTOR" && (() => {
+        // Busca de convites pendentes vai ser renderizada inline
+        return (
+          <>
+            {/* Formulário de convite */}
+            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="mb-4">
                 <h2 className="font-semibold text-slate-900">
-                  Organizações na sua carteira
+                  Convidar organização
                 </h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  {orgs.length} organização{orgs.length > 1 ? "ões" : ""} vinculada{orgs.length > 1 ? "s" : ""}.
+                <p className="mt-1 text-sm text-slate-600">
+                  Envie um convite para vincular uma nova organização à sua
+                  carteira. Ela receberá um link para criar a conta.
                 </p>
               </div>
-              <ul className="divide-y divide-slate-200">
-                {orgs.map((org) => (
-                  <li
-                    key={org.id}
-                    className="flex items-center justify-between gap-4 p-5"
+
+              <form
+                action={createOrgInviteAction}
+                className="grid gap-4 sm:grid-cols-6"
+              >
+                <div className="sm:col-span-3">
+                  <label className="mb-1 block text-xs font-medium text-slate-600">
+                    E-mail da organização *
+                  </label>
+                  <input
+                    name="email"
+                    type="email"
+                    required
+                    placeholder="contato@organizacao.org.br"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
+                  />
+                </div>
+
+                <div className="sm:col-span-3">
+                  <label className="mb-1 block text-xs font-medium text-slate-600">
+                    Nome sugerido (opcional)
+                  </label>
+                  <input
+                    name="org_name"
+                    placeholder="Ex: Instituto Comunidade Viva"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
+                  />
+                </div>
+
+                <div className="sm:col-span-6">
+                  <button
+                    type="submit"
+                    className="inline-flex w-full items-center justify-center rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-700 sm:w-auto"
                   >
-                    <div className="min-w-0">
-                      <h3 className="truncate text-base font-semibold text-slate-900">
-                        {org.name}
-                      </h3>
-                      <p className="mt-1 text-sm text-slate-500">
-                        Identificador: {shortId(org.id)}
-                      </p>
-                    </div>
-                    <Link
-                      href={`/dashboard/organizations/${org.id}`}
-                      className="shrink-0 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                    >
-                      Abrir
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+                    Gerar convite
+                  </button>
+                </div>
+              </form>
             </section>
-          )}
-        </>
-      )}
+
+            {/* Organizações vinculadas */}
+            {orgs.length > 0 && (
+              <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="border-b border-slate-200 px-5 py-4">
+                  <h2 className="font-semibold text-slate-900">
+                    Organizações na sua carteira
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {orgs.length} organização{orgs.length > 1 ? "ões" : ""}{" "}
+                    vinculada{orgs.length > 1 ? "s" : ""}.
+                  </p>
+                </div>
+                <ul className="divide-y divide-slate-200">
+                  {orgs.map((org) => (
+                    <li
+                      key={org.id}
+                      className="flex items-center justify-between gap-4 p-5"
+                    >
+                      <div className="min-w-0">
+                        <h3 className="truncate text-base font-semibold text-slate-900">
+                          {org.name}
+                        </h3>
+                        <p className="mt-1 text-sm text-slate-500">
+                          Identificador: {shortId(org.id)}
+                        </p>
+                      </div>
+                      <Link
+                        href={`/dashboard/organizations/${org.id}`}
+                        className="shrink-0 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        Abrir
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {orgs.length === 0 && (
+              <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-slate-900">
+                  Nenhuma organização vinculada ainda
+                </h2>
+                <p className="mt-2 text-sm text-slate-600">
+                  Use o formulário acima para convidar sua primeira organização.
+                  Após aceitar o convite, ela aparecerá aqui.
+                </p>
+              </section>
+            )}
+          </>
+        );
+      })()}
 
       {/* ── CONSULTANT: visão somente leitura ── */}
       {role === "CONSULTANT" && (

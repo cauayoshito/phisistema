@@ -15,6 +15,7 @@ import {
   returnReport,
   saveDraft,
   submitReport,
+  recommendReport,
 } from "@/services/reports.service";
 import { getProjectByIdForUser } from "@/services/projects.service";
 import type { Json } from "@/types/database";
@@ -28,7 +29,6 @@ export type ActionResult =
   | { ok: true; message: string }
   | { ok: false; error: string };
 
-// Tipagem mínima local (evita ts7006)
 type TemplateField = { key: string };
 type TemplateSection = { fields: TemplateField[] };
 type TemplateData = { sections: TemplateSection[] };
@@ -118,7 +118,6 @@ function createStubPdfBuffer(reportId: string, versionNumber: number): Buffer {
   return Buffer.from(`%PDF-1.4\n${body}${xref}${trailer}`, "utf8");
 }
 
-// ✅ importante: não tratar NEXT_REDIRECT como erro
 function isNextRedirectError(err: unknown): boolean {
   if (!err || typeof err !== "object") return false;
   const digest = (err as any).digest;
@@ -158,8 +157,9 @@ export async function createReportAction(formData: FormData) {
   )) as TemplateData | null;
 
   const supabase = createClient();
+  const db = supabase as any;
 
-  const { data: report, error: reportError } = await supabase
+  const { data: report, error: reportError } = await db
     .schema("public")
     .from("reports")
     .insert({
@@ -196,7 +196,7 @@ export async function createReportAction(formData: FormData) {
     });
   }
 
-  const { error: versionError } = await supabase
+  const { error: versionError } = await db
     .schema("public")
     .from("report_versions")
     .insert({
@@ -246,7 +246,7 @@ export async function saveReportDraftAction(
   await saveDraft(reportId, dataJson, user.id);
 
   revalidatePath(`/dashboard/reports/${reportId}`);
-  revalidatePath(`/dashboard/projects/${report.project_id}`);
+  revalidatePath(`/dashboard/projects/${(report as any).project_id}`);
 }
 
 export async function saveReportDraftFromEditorAction(
@@ -261,7 +261,7 @@ export async function saveReportDraftFromEditorAction(
 
   revalidatePath(`/dashboard/reports/${reportId}`);
   revalidatePath(`/dashboard/reports/${reportId}/edit`);
-  revalidatePath(`/dashboard/projects/${report.project_id}`);
+  revalidatePath(`/dashboard/projects/${(report as any).project_id}`);
 
   redirect(`/dashboard/reports/${reportId}/edit?saved=1`);
 }
@@ -280,7 +280,7 @@ export async function submitReportAction(
     await submitReport(reportId, user.id);
 
     revalidatePath(`/dashboard/reports/${reportId}`);
-    revalidatePath(`/dashboard/projects/${report.project_id}`);
+    revalidatePath(`/dashboard/projects/${(report as any).project_id}`);
     revalidatePath(`/dashboard/reports`);
 
     return { ok: true, message: "Relatório enviado com sucesso." };
@@ -303,7 +303,7 @@ export async function reopenReportToDraftAction(
     await reopenToDraft(reportId, user.id);
 
     revalidatePath(`/dashboard/reports/${reportId}`);
-    revalidatePath(`/dashboard/projects/${report.project_id}`);
+    revalidatePath(`/dashboard/projects/${(report as any).project_id}`);
     revalidatePath(`/dashboard/reports`);
 
     return { ok: true, message: "Relatório reaberto para rascunho." };
@@ -317,7 +317,7 @@ export async function reopenReportToDraftAction(
 }
 
 // =========================
-// Reviews (se usado)
+// Reviews
 // =========================
 
 export async function approveReportAction(reportId: string, comment: string) {
@@ -327,7 +327,24 @@ export async function approveReportAction(reportId: string, comment: string) {
   await approveReport(reportId, comment, user.id);
 
   revalidatePath(`/dashboard/reports/${reportId}`);
-  revalidatePath(`/dashboard/projects/${report.project_id}`);
+  revalidatePath(`/dashboard/projects/${(report as any).project_id}`);
+  revalidatePath(`/dashboard/reports`);
+}
+
+/**
+ * P3.1: Consultor emite recomendação de aprovação SEM mudar status.
+ */
+export async function recommendApprovalAction(
+  reportId: string,
+  comment: string
+) {
+  const user = await requireUser();
+  const report = await getReport(reportId, user.id);
+
+  await recommendReport(reportId, comment, user.id);
+
+  revalidatePath(`/dashboard/reports/${reportId}`);
+  revalidatePath(`/dashboard/projects/${(report as any).project_id}`);
   revalidatePath(`/dashboard/reports`);
 }
 
@@ -338,7 +355,7 @@ export async function returnReportAction(reportId: string, comment: string) {
   await returnReport(reportId, comment, user.id);
 
   revalidatePath(`/dashboard/reports/${reportId}`);
-  revalidatePath(`/dashboard/projects/${report.project_id}`);
+  revalidatePath(`/dashboard/projects/${(report as any).project_id}`);
   revalidatePath(`/dashboard/reports`);
 }
 
@@ -355,11 +372,12 @@ export async function exportReportToPdfStubAction(
     const report = await getReport(reportId, user.id);
     const currentVersion = await getCurrentVersion(reportId);
 
-    const versionNumber = currentVersion?.version_number ?? 1;
+    const versionNumber = (currentVersion as any)?.version_number ?? 1;
     const filePath = `${reportId}/v${versionNumber}.pdf`;
     const pdfBuffer = createStubPdfBuffer(reportId, versionNumber);
 
     const supabase = createClient();
+
     const {
       data: { user: authUser },
       error: authError,
@@ -391,7 +409,7 @@ export async function exportReportToPdfStubAction(
     await createExportRecord(reportId, versionNumber, filePath, authUser.id);
 
     revalidatePath(`/dashboard/reports/${reportId}`);
-    revalidatePath(`/dashboard/projects/${report.project_id}`);
+    revalidatePath(`/dashboard/projects/${(report as any).project_id}`);
     revalidatePath(`/dashboard/reports`);
 
     return { ok: true, message: `Arquivo gerado em reports/${filePath}.` };
@@ -417,9 +435,9 @@ export async function duplicateReportAction(
     const newReport = await duplicateReport(reportId, user.id);
 
     revalidatePath("/dashboard/reports");
-    revalidatePath(`/dashboard/projects/${newReport.project_id}`);
+    revalidatePath(`/dashboard/projects/${(newReport as any).project_id}`);
 
-    redirect(`/dashboard/reports/${newReport.id}`);
+    redirect(`/dashboard/reports/${(newReport as any).id}`);
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     return {
@@ -442,7 +460,7 @@ export async function deleteReportAction(
     await deleteReport(reportId, user.id);
 
     revalidatePath("/dashboard/reports");
-    revalidatePath(`/dashboard/projects/${report.project_id}`);
+    revalidatePath(`/dashboard/projects/${(report as any).project_id}`);
 
     return { ok: true, message: "Relatório excluído." };
   } catch (error) {
@@ -515,7 +533,7 @@ export async function uploadReportPhotoAction(
     }
 
     const current = await getCurrentVersion(reportId);
-    const baseData = (current?.data as any) ?? {};
+    const baseData = ((current as any)?.data as any) ?? {};
     const assets = baseData.__assets ?? {};
     const photos: PhotoItem[] = Array.isArray(assets.photos)
       ? assets.photos
@@ -555,7 +573,7 @@ export async function uploadReportPhotoAction(
     revalidatePath(`/dashboard/reports/${reportId}/edit`);
     revalidatePath(`/dashboard/reports/${reportId}`);
     revalidatePath(`/dashboard/reports`);
-    revalidatePath(`/dashboard/projects/${report.project_id}`);
+    revalidatePath(`/dashboard/projects/${(report as any).project_id}`);
 
     return go(`?photo=1`);
   } catch (error) {
@@ -582,7 +600,7 @@ export async function removeReportPhotoAction(
     if (!path) return go(`?err=${encodeURIComponent("Path inválido.")}`);
 
     const current = await getCurrentVersion(reportId);
-    const baseData = (current?.data as any) ?? {};
+    const baseData = ((current as any)?.data as any) ?? {};
     const assets = baseData.__assets ?? {};
     const photos: PhotoItem[] = Array.isArray(assets.photos)
       ? assets.photos
@@ -604,7 +622,7 @@ export async function removeReportPhotoAction(
     };
 
     const supabase = createClient();
-    await supabase.storage.from(REPORTS_BUCKET).remove([path]); // best effort
+    await supabase.storage.from(REPORTS_BUCKET).remove([path]);
 
     await saveDraft(reportId, nextData as any, user.id);
     await logAction(
@@ -618,7 +636,7 @@ export async function removeReportPhotoAction(
     revalidatePath(`/dashboard/reports/${reportId}/edit`);
     revalidatePath(`/dashboard/reports/${reportId}`);
     revalidatePath(`/dashboard/reports`);
-    revalidatePath(`/dashboard/projects/${report.project_id}`);
+    revalidatePath(`/dashboard/projects/${(report as any).project_id}`);
 
     return go(`?removed=1`);
   } catch (error) {
@@ -690,7 +708,7 @@ async function uploadAttachmentCommon(
     throw new Error(`Falha ao enviar arquivo: ${uploadErr.message}`);
 
   const current = await getCurrentVersion(reportId);
-  const baseData = ensureAssetsShape((current?.data as any) ?? {});
+  const baseData = ensureAssetsShape(((current as any)?.data as any) ?? {});
   const assets = baseData.__assets;
 
   const item: AttachmentItem = {
@@ -732,7 +750,7 @@ async function removeAttachmentCommon(
   folder: "receipts" | "bank_statements" | "others"
 ) {
   const current = await getCurrentVersion(reportId);
-  const baseData = ensureAssetsShape((current?.data as any) ?? {});
+  const baseData = ensureAssetsShape(((current as any)?.data as any) ?? {});
   const assets = baseData.__assets;
 
   const list = assets.attachments[folder] as AttachmentItem[];
@@ -750,7 +768,7 @@ async function removeAttachmentCommon(
   };
 
   const supabase = createClient();
-  await supabase.storage.from(REPORTS_BUCKET).remove([path]); // best effort
+  await supabase.storage.from(REPORTS_BUCKET).remove([path]);
 
   await saveDraft(reportId, nextData as any, userId);
   await logAction(
@@ -791,7 +809,6 @@ export async function uploadReportReceiptAction(
       );
     }
 
-    // aceita pdf e imagem
     const okType =
       (file.type || "").startsWith("image/") || file.type === "application/pdf";
     if (!okType) {
@@ -847,7 +864,6 @@ export async function uploadReportBankStatementAction(
       );
     }
 
-    // extrato: preferencialmente PDF, mas aceita imagem
     const okType =
       (file.type || "").startsWith("image/") || file.type === "application/pdf";
     if (!okType) {

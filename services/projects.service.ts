@@ -8,13 +8,19 @@ type ProjectRow = Database["public"]["Tables"]["projects"]["Row"];
 type ProjectMembershipInsert = {
   project_id: string;
   user_id: string;
-  role: "OWNER" | "CONSULTANT" | "INVESTOR" | "VIEWER";
+  role: "OWNER" | "INVESTOR";
   created_by?: string | null;
+};
+
+type ProfileRow = {
+  id: string;
+  full_name: string | null;
+  email: string | null;
 };
 
 export type ProjectParticipantRow = {
   user_id: string;
-  role: "OWNER" | "CONSULTANT" | "INVESTOR" | "VIEWER";
+  role: "OWNER" | "CONSULTANT" | "INVESTOR";
   created_at?: string | null;
   full_name: string | null;
   email: string | null;
@@ -52,8 +58,9 @@ async function upsertProjectMembership(
   membership: ProjectMembershipInsert
 ): Promise<void> {
   const supabase = createClient();
+  const db = supabase as any;
 
-  const { error } = await supabase
+  const { error } = await db
     .schema("public")
     .from("project_memberships")
     .upsert(
@@ -82,8 +89,9 @@ export async function listProjectsForUser(
   userId: string
 ): Promise<ProjectRow[]> {
   const supabase = createClient();
+  const db = supabase as any;
 
-  const membershipRes = await supabase
+  const membershipRes = await db
     .schema("public")
     .from("project_memberships")
     .select("project_id")
@@ -97,13 +105,33 @@ export async function listProjectsForUser(
     );
   }
 
+  const consultantRes = await db
+    .schema("public")
+    .from("project_consultants")
+    .select("project_id")
+    .eq("consultant_user_id", userId)
+    .eq("active", true);
+
+  if (consultantRes.error) {
+    throw serviceError(
+      "Falha ao buscar projetos como consultor",
+      consultantRes.error,
+      "project_consultants.select"
+    );
+  }
+
   const projectIds = Array.from(
-    new Set((membershipRes.data ?? []).map((m) => m.project_id).filter(Boolean))
+    new Set(
+      [
+        ...(membershipRes.data ?? []).map((m: any) => m.project_id),
+        ...(consultantRes.data ?? []).map((c: any) => c.project_id),
+      ].filter(Boolean)
+    )
   );
 
   if (projectIds.length === 0) return [];
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .schema("public")
     .from("projects")
     .select("*")
@@ -122,8 +150,9 @@ export async function getProjectByIdForUser(
   userId: string
 ): Promise<ProjectRow | null> {
   const supabase = createClient();
+  const db = supabase as any;
 
-  const membershipRes = await supabase
+  const membershipRes = await db
     .schema("public")
     .from("project_memberships")
     .select("project_id")
@@ -139,9 +168,26 @@ export async function getProjectByIdForUser(
     );
   }
 
-  if (!membershipRes.data) return null;
+  const consultantRes = await db
+    .schema("public")
+    .from("project_consultants")
+    .select("project_id")
+    .eq("project_id", projectId)
+    .eq("consultant_user_id", userId)
+    .eq("active", true)
+    .maybeSingle();
 
-  const { data, error } = await supabase
+  if (consultantRes.error) {
+    throw serviceError(
+      "Falha ao validar acesso do consultor ao projeto",
+      consultantRes.error,
+      "project_consultants.accessCheck"
+    );
+  }
+
+  if (!membershipRes.data && !consultantRes.data) return null;
+
+  const { data, error } = await db
     .schema("public")
     .from("projects")
     .select("*")
@@ -160,6 +206,7 @@ export async function createProject(
   userId?: string
 ): Promise<ProjectRow> {
   const supabase = createClient();
+  const db = supabase as any;
 
   const {
     data: { user },
@@ -192,7 +239,9 @@ export async function createProject(
   const linkedEntityId = String(payload.linked_entity_id ?? "").trim();
 
   if (!linkedEntityId) {
-    throw new Error("Selecione um financiador cadastrado para criar o projeto.");
+    throw new Error(
+      "Selecione um financiador cadastrado para criar o projeto."
+    );
   }
 
   const linkedEntity = await getInstitutionalEntityByIdForOrganization(
@@ -207,7 +256,9 @@ export async function createProject(
   }
 
   if (String(linkedEntity.status ?? "").toUpperCase() !== "ACTIVE") {
-    throw new Error("O financiador selecionado nao esta ativo para novos projetos.");
+    throw new Error(
+      "O financiador selecionado nao esta ativo para novos projetos."
+    );
   }
 
   const linkedEntityName = String(linkedEntity.display_name ?? "").trim();
@@ -221,18 +272,15 @@ export async function createProject(
     );
   }
 
-  const rpcResponse = await supabase.rpc(
-    "create_project_secure" as never,
-    {
-      p_name: payload.title,
-      p_description: payload.description ?? null,
-      p_project_type: payload.project_type,
-      p_organization_id: organizationId,
-      p_linked_entity_id: linkedEntity.id,
-      p_linked_entity_name: linkedEntityName,
-      p_linked_entity_type: linkedEntityType,
-    } as never
-  );
+  const rpcResponse = await db.rpc("create_project_secure", {
+    p_name: payload.title,
+    p_description: payload.description ?? null,
+    p_project_type: payload.project_type,
+    p_organization_id: organizationId,
+    p_linked_entity_id: linkedEntity.id,
+    p_linked_entity_name: linkedEntityName,
+    p_linked_entity_type: linkedEntityType,
+  });
 
   const error = rpcResponse.error;
   const data = rpcResponse.data as ProjectRow | null;
@@ -266,8 +314,9 @@ export async function getProjectsByOrganization(
   organization_id: string
 ): Promise<ProjectRow[]> {
   const supabase = createClient();
+  const db = supabase as any;
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .schema("public")
     .from("projects")
     .select("*")
@@ -286,8 +335,9 @@ export async function updateProjectStatus(
   status: string
 ): Promise<ProjectRow> {
   const supabase = createClient();
+  const db = supabase as any;
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .schema("public")
     .from("projects")
     .update({ status })
@@ -308,8 +358,9 @@ export async function updateProjectStatus(
 
 export async function getProjectById(projectId: string): Promise<ProjectRow> {
   const supabase = createClient();
+  const db = supabase as any;
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .schema("public")
     .from("projects")
     .select("*")
@@ -327,8 +378,9 @@ export async function listProjectParticipants(
   projectId: string
 ): Promise<ProjectParticipantRow[]> {
   const supabase = createClient();
+  const db = supabase as any;
 
-  const membershipRes = await supabase
+  const membershipRes = await db
     .schema("public")
     .from("project_memberships")
     .select("user_id, role, created_at")
@@ -343,12 +395,50 @@ export async function listProjectParticipants(
     );
   }
 
-  const memberships = membershipRes.data ?? [];
-  if (memberships.length === 0) return [];
+  const consultantRes = await db
+    .schema("public")
+    .from("project_consultants")
+    .select("consultant_user_id, active, created_at")
+    .eq("project_id", projectId)
+    .eq("active", true)
+    .order("created_at", { ascending: true });
 
-  const userIds = memberships.map((membership) => membership.user_id);
+  if (consultantRes.error) {
+    throw serviceError(
+      "Falha ao listar consultores do projeto",
+      consultantRes.error,
+      "project_consultants.selectParticipants"
+    );
+  }
 
-  const profilesRes = await supabase
+  const memberships = (membershipRes.data ?? []) as any[];
+  const consultants = (consultantRes.data ?? []) as any[];
+
+  const normalizedMembers = memberships.map((membership) => ({
+    user_id: membership.user_id,
+    role: membership.role,
+    created_at: membership.created_at ?? null,
+  }));
+
+  const normalizedConsultants = consultants
+    .filter(
+      (c) =>
+        c.consultant_user_id &&
+        !normalizedMembers.some((m) => m.user_id === c.consultant_user_id)
+    )
+    .map((c) => ({
+      user_id: c.consultant_user_id,
+      role: "CONSULTANT",
+      created_at: c.created_at ?? null,
+    }));
+
+  const participants = [...normalizedMembers, ...normalizedConsultants];
+
+  if (participants.length === 0) return [];
+
+  const userIds = participants.map((participant) => participant.user_id);
+
+  const profilesRes = await db
     .schema("public")
     .from("profiles")
     .select("id, full_name, email")
@@ -362,16 +452,23 @@ export async function listProjectParticipants(
     );
   }
 
-  const profilesMap = new Map(
-    (profilesRes.data ?? []).map((profile) => [profile.id, profile])
+  const profilesMap = new Map<string, ProfileRow>(
+    (profilesRes.data ?? []).map((profile: any) => [
+      profile.id,
+      {
+        id: profile.id,
+        full_name: profile.full_name ?? null,
+        email: profile.email ?? null,
+      },
+    ])
   );
 
-  return memberships.map((membership) => {
-    const profile = profilesMap.get(membership.user_id);
+  return participants.map((participant) => {
+    const profile = profilesMap.get(participant.user_id);
     return {
-      user_id: membership.user_id,
-      role: membership.role as ProjectParticipantRow["role"],
-      created_at: membership.created_at,
+      user_id: participant.user_id,
+      role: participant.role as ProjectParticipantRow["role"],
+      created_at: participant.created_at,
       full_name: profile?.full_name ?? null,
       email: profile?.email ?? null,
     };
@@ -381,13 +478,43 @@ export async function listProjectParticipants(
 export async function addProjectParticipant(
   projectId: string,
   userId: string,
-  role: "CONSULTANT" | "INVESTOR" | "VIEWER",
+  role: "CONSULTANT" | "INVESTOR",
   createdBy?: string
 ): Promise<void> {
+  const supabase = createClient();
+  const db = supabase as any;
+
+  if (role === "CONSULTANT") {
+    const { error } = await db
+      .schema("public")
+      .from("project_consultants")
+      .upsert(
+        {
+          project_id: projectId,
+          consultant_user_id: userId,
+          active: true,
+        },
+        {
+          onConflict: "project_id,consultant_user_id",
+          ignoreDuplicates: false,
+        }
+      );
+
+    if (error) {
+      throw serviceError(
+        "Falha ao vincular consultor ao projeto",
+        error,
+        "project_consultants.upsert"
+      );
+    }
+
+    return;
+  }
+
   await upsertProjectMembership({
     project_id: projectId,
     user_id: userId,
-    role,
+    role: "INVESTOR",
     created_by: createdBy ?? null,
   });
 }
@@ -397,8 +524,9 @@ export async function removeProjectParticipant(
   userId: string
 ): Promise<void> {
   const supabase = createClient();
+  const db = supabase as any;
 
-  const currentRes = await supabase
+  const currentRes = await db
     .schema("public")
     .from("project_memberships")
     .select("role")
@@ -414,24 +542,62 @@ export async function removeProjectParticipant(
     );
   }
 
-  if (!currentRes.data) return;
+  if (currentRes.data) {
+    if (String(currentRes.data.role).toUpperCase() === "OWNER") {
+      throw new Error(
+        "O criador do projeto nao pode ser removido dos participantes."
+      );
+    }
 
-  if (String(currentRes.data.role).toUpperCase() === "OWNER") {
-    throw new Error("O criador do projeto nao pode ser removido dos participantes.");
+    const { error } = await db
+      .schema("public")
+      .from("project_memberships")
+      .delete()
+      .eq("project_id", projectId)
+      .eq("user_id", userId);
+
+    if (error) {
+      throw serviceError(
+        "Falha ao remover participante do projeto",
+        error,
+        "project_memberships.delete"
+      );
+    }
+
+    return;
   }
 
-  const { error } = await supabase
+  const consultantRes = await db
     .schema("public")
-    .from("project_memberships")
-    .delete()
+    .from("project_consultants")
+    .select("project_id")
     .eq("project_id", projectId)
-    .eq("user_id", userId);
+    .eq("consultant_user_id", userId)
+    .eq("active", true)
+    .maybeSingle();
+
+  if (consultantRes.error) {
+    throw serviceError(
+      "Falha ao verificar consultor do projeto",
+      consultantRes.error,
+      "project_consultants.selectBeforeDelete"
+    );
+  }
+
+  if (!consultantRes.data) return;
+
+  const { error } = await db
+    .schema("public")
+    .from("project_consultants")
+    .update({ active: false })
+    .eq("project_id", projectId)
+    .eq("consultant_user_id", userId);
 
   if (error) {
     throw serviceError(
-      "Falha ao remover participante do projeto",
+      "Falha ao remover consultor do projeto",
       error,
-      "project_memberships.delete"
+      "project_consultants.update"
     );
   }
 }

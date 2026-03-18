@@ -7,7 +7,7 @@ import type { Database, Json } from "@/types/database";
 type ReportRow = Database["public"]["Tables"]["reports"]["Row"];
 type ReportVersionRow = Database["public"]["Tables"]["report_versions"]["Row"];
 
-type Decision = "APPROVED" | "RETURNED";
+type Decision = "APPROVED" | "RETURNED" | "RECOMMENDED";
 
 function normalizeRole(role: string | null | undefined): string {
   return (role ?? "").trim().toUpperCase();
@@ -31,7 +31,9 @@ async function requireProjectAccessByReportId(
   userId: string
 ): Promise<ReportRow> {
   const supabase = createClient();
-  const { data: report, error } = await supabase
+  const db = supabase as any;
+
+  const { data: report, error } = await db
     .from("reports")
     .select("*")
     .eq("id", reportId)
@@ -59,19 +61,21 @@ export async function listProjectsForUserReports(
   const ctx = await getUserContext(userId);
   const orgId = getOrgIdFromContext(ctx);
   const supabase = createClient();
+  const db = supabase as any;
 
   async function trySelect(
     selectExpr: string,
     labelKey: "name" | "title" | "project_name"
   ): Promise<Array<{ id: string; label: string }> | null> {
-    const base = supabase
+    const base = db
       .from("projects")
-      .select(selectExpr as any)
+      .select(selectExpr)
       .order("created_at", { ascending: false });
 
     const { data, error } = orgId
       ? await base.eq("organization_id", orgId)
       : await base;
+
     if (error) return null;
 
     const rows = (data ?? []) as any[];
@@ -91,12 +95,12 @@ export async function listProjectsForUserReports(
   if (byProjectName) return byProjectName;
 
   const { data, error } = orgId
-    ? await supabase
+    ? await db
         .from("projects")
         .select("id")
         .eq("organization_id", orgId)
         .order("created_at", { ascending: false })
-    : await supabase
+    : await db
         .from("projects")
         .select("id")
         .order("created_at", { ascending: false });
@@ -115,6 +119,7 @@ export async function listProjectsForUserReports(
 export async function listReportsForUser(userId: string) {
   await getUserContext(userId);
   const supabase = createClient();
+  const db = supabase as any;
 
   const joinAttempts = [
     {
@@ -141,9 +146,9 @@ export async function listReportsForUser(userId: string) {
   ];
 
   for (const attempt of joinAttempts) {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("reports")
-      .select(attempt.select as any)
+      .select(attempt.select)
       .order("created_at", { ascending: false });
 
     if (!error && data) {
@@ -160,7 +165,7 @@ export async function listReportsForUser(userId: string) {
     }
   }
 
-  const { data: raw, error: repErr } = await supabase
+  const { data: raw, error: repErr } = await db
     .from("reports")
     .select(
       "id, title, status, created_at, period_start, period_end, project_id"
@@ -185,15 +190,20 @@ export async function listReportsForUser(userId: string) {
     ];
 
     for (const t of tries) {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("projects")
-        .select(t.select as any)
+        .select(t.select)
         .in("id", projectIds);
+
       if (error) continue;
-      for (const p of (data ?? []) as any[])
+
+      for (const p of (data ?? []) as any[]) {
         map.set(String(p.id), String(p[t.key] ?? p.id));
+      }
+
       if (map.size > 0) break;
     }
+
     return map;
   })();
 
@@ -217,7 +227,9 @@ export async function listReportsByProject(
   if (!project) throw new Error("Acesso negado ao projeto.");
 
   const supabase = createClient();
-  const { data, error } = await supabase
+  const db = supabase as any;
+
+  const { data, error } = await db
     .from("reports")
     .select("*")
     .eq("project_id", projectId)
@@ -238,7 +250,9 @@ export async function listVersions(
   reportId: string
 ): Promise<ReportVersionRow[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  const db = supabase as any;
+
+  const { data, error } = await db
     .from("report_versions")
     .select("*")
     .eq("report_id", reportId)
@@ -252,7 +266,9 @@ export async function getCurrentVersion(
   reportId: string
 ): Promise<ReportVersionRow | null> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  const db = supabase as any;
+
+  const { data, error } = await db
     .from("report_versions")
     .select("*")
     .eq("report_id", reportId)
@@ -267,6 +283,7 @@ export async function getCurrentVersion(
 export async function getReportDetail(reportId: string, userId: string) {
   const report = await requireProjectAccessByReportId(reportId, userId);
   const supabase = createClient();
+  const db = supabase as any;
 
   const label = await (async () => {
     const tries: Array<{
@@ -279,14 +296,15 @@ export async function getReportDetail(reportId: string, userId: string) {
     ];
 
     for (const t of tries) {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("projects")
-        .select(t.select as any)
+        .select(t.select)
         .eq("id", report.project_id)
         .maybeSingle();
 
-      if (!error && data)
+      if (!error && data) {
         return String((data as any)[t.key] ?? report.project_id);
+      }
     }
 
     return String(report.project_id);
@@ -321,11 +339,11 @@ export async function saveDraft(
   }
 
   const supabase = createClient();
+  const db = supabase as any;
   const current = await getCurrentVersion(reportId);
 
-  // Regra: se já existe uma versão DRAFT atual, tenta atualizar ela.
   if (current && normalizeStatus(current.status as any) === "DRAFT") {
-    const { data: updated, error: updErr } = await supabase
+    const { data: updated, error: updErr } = await db
       .from("report_versions")
       .update({
         data: dataJson,
@@ -340,9 +358,8 @@ export async function saveDraft(
       throw new Error(`Falha ao atualizar rascunho: ${updErr.message}`);
     }
 
-    // Se não veio linha (RLS pode esconder o retorno), faz fallback criando nova versão
     if (updated) {
-      await supabase
+      await db
         .from("reports")
         .update({ updated_at: new Date().toISOString() })
         .eq("id", report.id);
@@ -359,10 +376,9 @@ export async function saveDraft(
     }
   }
 
-  // Fallback: cria uma nova versão DRAFT
   const nextVersionNumber = current ? current.version_number + 1 : 1;
 
-  const { data: inserted, error: insErr } = await supabase
+  const { data: inserted, error: insErr } = await db
     .from("report_versions")
     .insert({
       report_id: reportId,
@@ -377,13 +393,14 @@ export async function saveDraft(
   if (insErr) {
     throw new Error(`Falha ao criar rascunho: ${insErr.message}`);
   }
+
   if (!inserted) {
     throw new Error(
       "Falha ao criar rascunho: nenhuma linha retornada (verifique RLS em report_versions)."
     );
   }
 
-  const { error: reportErr } = await supabase
+  const { error: reportErr } = await db
     .from("reports")
     .update({
       status: "DRAFT",
@@ -423,10 +440,11 @@ export async function submitReport(
   }
 
   const supabase = createClient();
+  const db = supabase as any;
   const current = await getCurrentVersion(reportId);
   const nextVersionNumber = current ? current.version_number + 1 : 1;
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("report_versions")
     .insert({
       report_id: reportId,
@@ -440,7 +458,7 @@ export async function submitReport(
 
   if (error) throw new Error(`Falha ao enviar relatório: ${error.message}`);
 
-  const { error: reportError } = await supabase
+  const { error: reportError } = await db
     .from("reports")
     .update({
       status: "SUBMITTED",
@@ -483,10 +501,11 @@ export async function reopenToDraft(
   }
 
   const supabase = createClient();
+  const db = supabase as any;
   const current = await getCurrentVersion(reportId);
   const nextVersionNumber = current ? current.version_number + 1 : 1;
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("report_versions")
     .insert({
       report_id: reportId,
@@ -500,7 +519,7 @@ export async function reopenToDraft(
 
   if (error) throw new Error(`Falha ao reabrir: ${error.message}`);
 
-  const { error: reportError } = await supabase
+  const { error: reportError } = await db
     .from("reports")
     .update({
       status: "DRAFT",
@@ -509,8 +528,9 @@ export async function reopenToDraft(
     })
     .eq("id", report.id);
 
-  if (reportError)
+  if (reportError) {
     throw new Error(`Falha ao atualizar report: ${reportError.message}`);
+  }
 
   await logAction(
     "reopen_report_draft",
@@ -532,43 +552,56 @@ async function reviewReport(
   const report = await requireProjectAccessByReportId(reportId, userId);
   const ctx = await getUserContext(userId);
 
-  // seu enum não tem CONSULTANT em memberships.role (pelo erro), então aqui depende do seu ctx.roles
-  if (!ctx.roles?.includes?.("CONSULTANT")) {
-    throw new Error("Apenas consultor pode revisar relatório.");
+  const isReviewer =
+    ctx.roles?.includes?.("CONSULTANT") || ctx.roles?.includes?.("INVESTOR");
+
+  if (!isReviewer) {
+    throw new Error(
+      "Apenas financiadores e consultores podem avaliar relatórios."
+    );
   }
 
   const status = decision === "APPROVED" ? "APPROVED" : "RETURNED";
 
   const supabase = createClient();
+  const db = supabase as any;
   const current = await getCurrentVersion(reportId);
 
-  const payload: Record<string, any> = {
+  const payload: any = {
     status,
     updated_at: new Date().toISOString(),
   };
 
-  if (status === "APPROVED") payload.approved_at = new Date().toISOString();
+  if (status === "APPROVED") {
+    payload.approved_at = new Date().toISOString();
+  }
 
-  const { error: reportError } = await supabase
+  const { error: reportError } = await db
     .from("reports")
     .update(payload)
     .eq("id", report.id);
 
-  if (reportError)
+  if (reportError) {
     throw new Error(
       `Falha ao atualizar status do relatório: ${reportError.message}`
     );
+  }
 
-  const { error: reviewError } = await supabase.from("report_reviews").insert({
+  const reviewInsert: any = {
     report_id: reportId,
     version_number: current?.version_number ?? 1,
     reviewer_user_id: userId,
     decision,
     comment,
-  });
+  };
 
-  if (reviewError)
+  const { error: reviewError } = await db
+    .from("report_reviews")
+    .insert(reviewInsert);
+
+  if (reviewError) {
     throw new Error(`Falha ao registrar revisão: ${reviewError.message}`);
+  }
 
   await logAction(
     decision === "APPROVED" ? "approve_report" : "return_report",
@@ -577,6 +610,37 @@ async function reviewReport(
     { version_number: current?.version_number ?? 1, comment },
     userId
   );
+}
+
+/**
+ * P1.4/P1.5: Busca a revisão mais recente de um relatório.
+ * Usado para exibir o comentário do financiador/consultor na detail page.
+ */
+export async function getLatestReview(reportId: string) {
+  try {
+    const supabase = createClient();
+    const db = supabase as any;
+
+    const { data, error } = await db
+      .from("report_reviews")
+      .select("id, decision, comment, reviewer_user_id, created_at")
+      .eq("report_id", reportId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) return null;
+
+    return data as {
+      id: string;
+      decision: string;
+      comment: string | null;
+      reviewer_user_id: string;
+      created_at: string;
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function returnReport(
@@ -596,12 +660,89 @@ export async function approveReport(
 }
 
 /**
+ * P3.1: Consultor recomenda aprovação SEM mudar o status do relatório.
+ * O relatório continua SUBMITTED — o investor decide depois.
+ */
+export async function recommendReport(
+  reportId: string,
+  comment: string,
+  userId: string
+): Promise<void> {
+  const report = await requireProjectAccessByReportId(reportId, userId);
+  const ctx = await getUserContext(userId);
+
+  if (!ctx.roles?.includes?.("CONSULTANT")) {
+    throw new Error("Apenas consultores podem emitir recomendações.");
+  }
+
+  const supabase = createClient();
+  const db = supabase as any;
+  const current = await getCurrentVersion(reportId);
+
+  const reviewInsert: any = {
+    report_id: reportId,
+    version_number: current?.version_number ?? 1,
+    reviewer_user_id: userId,
+    decision: "RECOMMENDED",
+    comment: comment || "Recomendo aprovação.",
+  };
+
+  const { error: reviewError } = await db
+    .from("report_reviews")
+    .insert(reviewInsert);
+
+  if (reviewError) {
+    throw new Error(`Falha ao registrar recomendação: ${reviewError.message}`);
+  }
+
+  await logAction(
+    "recommend_report",
+    "report",
+    reportId,
+    { version_number: current?.version_number ?? 1, comment },
+    userId
+  );
+}
+
+/**
+ * P3.1: Busca a recomendação do consultor (se existir) para exibir ao investor.
+ */
+export async function getConsultantRecommendation(reportId: string) {
+  try {
+    const supabase = createClient();
+    const db = supabase as any;
+
+    const { data, error } = await db
+      .from("report_reviews")
+      .select("id, decision, comment, reviewer_user_id, created_at")
+      .eq("report_id", reportId)
+      .eq("decision", "RECOMMENDED")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) return null;
+
+    return data as {
+      id: string;
+      decision: string;
+      comment: string | null;
+      reviewer_user_id: string;
+      created_at: string;
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Necessário para o fluxo de template (resolve "is not a function")
  */
 export async function getReportTemplateForProjectType(projectType: string) {
   const supabase = createClient();
+  const db = supabase as any;
 
-  const { data: template, error: templateError } = await supabase
+  const { data: template, error: templateError } = await db
     .from("report_templates")
     .select("*")
     .eq("project_type", projectType)
@@ -610,35 +751,38 @@ export async function getReportTemplateForProjectType(projectType: string) {
     .limit(1)
     .maybeSingle();
 
-  if (templateError)
+  if (templateError) {
     throw new Error(`Falha ao buscar template: ${templateError.message}`);
+  }
   if (!template) return null;
 
-  const { data: sections, error: sectionsError } = await supabase
+  const { data: sections, error: sectionsError } = await db
     .from("template_sections")
     .select("*")
     .eq("template_id", template.id)
     .order("sort_order", { ascending: true });
 
-  if (sectionsError)
+  if (sectionsError) {
     throw new Error(
       `Falha ao buscar seções do template: ${sectionsError.message}`
     );
+  }
 
   const sectionIds = (sections ?? []).map((s: any) => s.id);
 
   const { data: fields, error: fieldsError } = sectionIds.length
-    ? await supabase
+    ? await db
         .from("template_fields")
         .select("*")
         .in("section_id", sectionIds)
         .order("sort_order", { ascending: true })
     : { data: [], error: null };
 
-  if (fieldsError)
+  if (fieldsError) {
     throw new Error(
       `Falha ao buscar campos do template: ${fieldsError.message}`
     );
+  }
 
   return {
     template,
@@ -655,6 +799,7 @@ export async function getReportTemplateForProjectType(projectType: string) {
 export async function duplicateReport(reportId: string, userId: string) {
   const original = await requireProjectAccessByReportId(reportId, userId);
   const supabase = createClient();
+  const db = supabase as any;
 
   const current = await getCurrentVersion(reportId);
 
@@ -663,7 +808,7 @@ export async function duplicateReport(reportId: string, userId: string) {
       ? `${String(original.title).trim()} (cópia)`
       : null;
 
-  const { data: newReport, error: insErr } = await supabase
+  const { data: newReport, error: insErr } = await db
     .from("reports")
     .insert({
       project_id: original.project_id,
@@ -684,7 +829,7 @@ export async function duplicateReport(reportId: string, userId: string) {
     );
   }
 
-  const { error: verErr } = await supabase.from("report_versions").insert({
+  const { error: verErr } = await db.from("report_versions").insert({
     report_id: newReport.id,
     version_number: 1,
     status: "DRAFT",
@@ -693,7 +838,7 @@ export async function duplicateReport(reportId: string, userId: string) {
   });
 
   if (verErr) {
-    await supabase.from("reports").delete().eq("id", newReport.id);
+    await db.from("reports").delete().eq("id", newReport.id);
     throw new Error(`Falha ao criar versão do duplicado: ${verErr.message}`);
   }
 
@@ -721,13 +866,15 @@ export async function deleteReport(reportId: string, userId: string) {
   }
 
   const supabase = createClient();
+  const db = supabase as any;
 
-  await supabase.from("report_versions").delete().eq("report_id", reportId);
+  await db.from("report_versions").delete().eq("report_id", reportId);
 
-  const { error: delErr } = await supabase
+  const { error: delErr } = await db
     .from("reports")
     .delete()
     .eq("id", reportId);
+
   if (delErr) throw new Error(`Falha ao excluir relatório: ${delErr.message}`);
 
   await logAction("delete_report", "report", reportId, {}, userId);

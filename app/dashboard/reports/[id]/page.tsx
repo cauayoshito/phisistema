@@ -3,13 +3,12 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/services/auth.service";
 import { getUserContext } from "@/services/membership.service";
 import { getPrimaryRole } from "@/lib/roles";
-import { getReportDetail } from "@/services/reports.service";
+import { getReportDetail, getLatestReview, getConsultantRecommendation } from "@/services/reports.service";
 import {
   submitReportAction,
   reopenReportToDraftAction,
-  approveReportAction,
-  returnReportAction,
 } from "@/app/actions/report.actions";
+import ReviewReportButtons from "@/components/dashboard/ReviewReportButtons";
 import { REPORT_STATUS_LABEL, type ReportStatus } from "@/lib/status";
 
 export const dynamic = "force-dynamic";
@@ -20,21 +19,15 @@ type Props = {
 
 function formatDate(value: unknown) {
   if (!value) return "-";
-
   const d = new Date(String(value));
   if (Number.isNaN(d.getTime())) return "-";
-
-  return new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "short",
-  }).format(d);
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(d);
 }
 
 function formatDateTime(value: unknown) {
   if (!value) return "-";
-
   const d = new Date(String(value));
   if (Number.isNaN(d.getTime())) return "-";
-
   return new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "short",
     timeStyle: "medium",
@@ -75,16 +68,6 @@ async function safeReopen(reportId: string) {
   await reopenReportToDraftAction(reportId);
 }
 
-async function safeApprove(reportId: string) {
-  "use server";
-  await approveReportAction(reportId, "Aprovado pelo financiador.");
-}
-
-async function safeReturn(reportId: string) {
-  "use server";
-  await returnReportAction(reportId, "Devolvido para ajustes.");
-}
-
 export default async function ReportDetailPage({ params }: Props) {
   const user = await requireUser();
 
@@ -113,12 +96,26 @@ export default async function ReportDetailPage({ params }: Props) {
   const canEdit = status === "DRAFT" && isOrg;
   const canSubmit = status === "DRAFT" && isOrg;
   const canReopen = status === "RETURNED" && isOrg;
-  const canApprove = status === "SUBMITTED" && isReviewer;
-  const canReturn = status === "SUBMITTED" && isReviewer;
+  const canReview = status === "SUBMITTED" && isReviewer;
 
   const isLockedForOrg =
     isOrg &&
     (status === "SUBMITTED" || status === "APPROVED" || status === "RETURNED");
+
+  // P1.5: Buscar último comentário de avaliação
+  const latestReview = await getLatestReview(reportId);
+  const hasReviewComment =
+    latestReview?.comment && latestReview.comment.trim().length > 0;
+
+  // P3.1: Buscar recomendação do consultor (se existir)
+  const recommendation = await getConsultantRecommendation(reportId);
+  const hasRecommendation =
+    recommendation?.comment && recommendation.comment.trim().length > 0;
+
+  // Consultor que já recomendou não pode recomendar de novo
+  const consultantAlreadyRecommended =
+    role === "CONSULTANT" && hasRecommendation;
+  const canReviewFinal = canReview && !consultantAlreadyRecommended;
 
   return (
     <main className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
@@ -191,48 +188,101 @@ export default async function ReportDetailPage({ params }: Props) {
             </form>
           )}
 
-          {canApprove && (
-            <form action={safeApprove.bind(null, reportId)}>
-              <button
-                className="rounded bg-emerald-600 px-4 py-2 text-sm text-white transition hover:bg-emerald-700"
-                type="submit"
-              >
-                Aprovar
-              </button>
-            </form>
-          )}
-
-          {canReturn && (
-            <form action={safeReturn.bind(null, reportId)}>
-              <button
-                className="rounded bg-amber-600 px-4 py-2 text-sm text-white transition hover:bg-amber-700"
-                type="submit"
-              >
-                Devolver p/ ajustes
-              </button>
-            </form>
+          {/* P1.4: Botões com modal de comentário para INVESTOR/CONSULTANT */}
+          {canReviewFinal && (
+            <ReviewReportButtons reportId={reportId} roleLabel={role} />
           )}
         </div>
       </header>
 
-      {isLockedForOrg && (
+      {/* P3.1: Parecer do consultor — visível para INVESTOR e ORG quando relatório ainda está SUBMITTED */}
+      {hasRecommendation && status === "SUBMITTED" && (
+        <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+          <div className="flex items-start gap-3">
+            <span className="text-lg">📋</span>
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold text-indigo-900">
+                Parecer do consultor
+              </h3>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-indigo-800">
+                {recommendation!.comment}
+              </p>
+              <p className="mt-2 text-xs text-slate-500">
+                Recomendação emitida em {formatDateTime(recommendation!.created_at)}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* P3.1: Consultor que já recomendou vê confirmação */}
+      {consultantAlreadyRecommended && status === "SUBMITTED" && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
+          Seu parecer foi emitido. Aguardando decisão final do financiador.
+        </div>
+      )}
+
+      {/* P1.5: Comentário do avaliador — visível quando devolvido ou aprovado */}
+      {hasReviewComment && (status === "RETURNED" || status === "APPROVED") && (
+        <div
+          className={[
+            "rounded-lg border p-4",
+            status === "RETURNED"
+              ? "border-rose-200 bg-rose-50"
+              : "border-emerald-200 bg-emerald-50",
+          ].join(" ")}
+        >
+          <div className="flex items-start gap-3">
+            <span className="text-lg">
+              {status === "RETURNED" ? "💬" : "✅"}
+            </span>
+            <div className="min-w-0">
+              <h3
+                className={[
+                  "text-sm font-semibold",
+                  status === "RETURNED" ? "text-rose-900" : "text-emerald-900",
+                ].join(" ")}
+              >
+                {status === "RETURNED"
+                  ? "Observação do avaliador"
+                  : "Comentário de aprovação"}
+              </h3>
+              <p
+                className={[
+                  "mt-1 whitespace-pre-wrap text-sm",
+                  status === "RETURNED" ? "text-rose-800" : "text-emerald-800",
+                ].join(" ")}
+              >
+                {latestReview!.comment}
+              </p>
+              <p className="mt-2 text-xs text-slate-500">
+                {formatDateTime(latestReview!.created_at)}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isLockedForOrg && status === "SUBMITTED" && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
           Relatório enviado para análise. A edição está temporariamente
           bloqueada até nova devolução ou conclusão da avaliação.
         </div>
       )}
 
-      {!canEdit && !canSubmit && !canReopen && isOrg && (
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-          Este relatório está em modo de visualização. Novas edições só ficam
-          disponíveis quando ele voltar para rascunho.
+      {!canEdit && !canSubmit && !canReopen && isOrg && status === "APPROVED" && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
+          Este relatório foi aprovado. Nenhuma ação adicional necessária.
         </div>
       )}
 
-      {!canApprove && !canReturn && isReviewer && status !== "DRAFT" && (
+      {!canReviewFinal && isReviewer && !consultantAlreadyRecommended && status !== "DRAFT" && status !== "SUBMITTED" && (
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-          Nenhuma ação adicional está disponível para este relatório no status
-          atual.
+          {status === "APPROVED"
+            ? "Este relatório já foi aprovado."
+            : status === "RETURNED"
+            ? "Este relatório foi devolvido para ajustes. Aguardando reenvio pela organização."
+            : "Nenhuma ação disponível para o status atual."}
         </div>
       )}
 

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { changeProjectStatusAction } from "@/app/actions/project-status.actions";
 
 import { isConsultant } from "@/lib/permissions";
+import { getPrimaryRole } from "@/lib/roles";
 import { PROJECT_STATUS_LABEL, type ProjectStatus } from "@/lib/status";
 
 import { requireUser } from "@/services/auth.service";
@@ -173,6 +174,10 @@ export default async function DashboardProjectDetailPage({
 
   const isOrgUser = ctx.roles.includes("ORG");
   const consultant = isConsultant(ctx);
+  const role = getPrimaryRole(ctx);
+
+  // P2.1: INVESTOR/CONSULTANT = somente leitura (vê dados, não edita)
+  const isReadOnly = !isOrgUser;
 
   const isLockedForOrg =
     isOrgUser &&
@@ -199,7 +204,8 @@ export default async function DashboardProjectDetailPage({
   const isOrgAdmin = normalizeRole(currentOrgMembership?.role) === "ORG_ADMIN";
 
   const canManageParticipants = isProjectOwner || isOrgAdmin;
-  const canEditParticipants = canManageParticipants && canEditProjectContent;
+  const canEditParticipants =
+    canManageParticipants && canEditProjectContent && !isReadOnly;
 
   const errorMessage = readQueryValue(searchParams?.error);
   const successMessage = readQueryValue(searchParams?.success);
@@ -242,6 +248,16 @@ export default async function DashboardProjectDetailPage({
       {successMessage && (
         <div className="rounded border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
           {successMessage}
+        </div>
+      )}
+
+      {isReadOnly && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+          Você está visualizando este projeto como{" "}
+          <span className="font-semibold">
+            {role === "INVESTOR" ? "financiador" : "consultor"}
+          </span>
+          . Os dados são somente leitura.
         </div>
       )}
 
@@ -369,6 +385,10 @@ export default async function DashboardProjectDetailPage({
               Este projeto já foi enviado para análise. A aba de planejamento
               está em modo de visualização até nova devolução.
             </div>
+          ) : isReadOnly ? (
+            <div className="pointer-events-none select-none opacity-90">
+              <ProjectPlan project={project as any} />
+            </div>
           ) : (
             <ProjectPlan project={project as any} />
           ))}
@@ -379,6 +399,10 @@ export default async function DashboardProjectDetailPage({
               Este projeto já foi enviado para análise. A aba financeira está em
               modo de visualização até nova devolução.
             </div>
+          ) : isReadOnly ? (
+            <div className="pointer-events-none select-none opacity-90">
+              <ProjectFinancial project={project as any} />
+            </div>
           ) : (
             <ProjectFinancial project={project as any} />
           ))}
@@ -388,6 +412,13 @@ export default async function DashboardProjectDetailPage({
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
               Este projeto já foi enviado para análise. O envio de novos
               documentos está temporariamente bloqueado.
+            </div>
+          ) : isReadOnly ? (
+            <div className="pointer-events-none select-none opacity-90">
+              <ProjectDocuments
+                projectId={String(project.id)}
+                projectType={String(projectType)}
+              />
             </div>
           ) : (
             <ProjectDocuments

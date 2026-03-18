@@ -12,6 +12,7 @@ export function getSidebarMenuItems(role: PrimaryRole): SidebarItem[] {
     case "INVESTOR":
       return [
         { href: "/dashboard", icon: "📊", label: "Painel" },
+        { href: "/dashboard/organizations", icon: "👥", label: "Organizações" },
         { href: "/dashboard/projects", icon: "🗂️", label: "Projetos" },
         { href: "/dashboard/reports", icon: "📄", label: "Relatórios" },
       ];

@@ -2,8 +2,6 @@ import Link from "next/link";
 import StatCard from "@/components/dashboard/StatCard";
 import {
   formatarData,
-  formatarDataHora,
-  reportStatusLabel,
   projectStatusLabel,
   projectTypeLabel,
   pct,
@@ -13,12 +11,16 @@ type Props = {
   nome: string;
   projetos: any[];
   relatorios: any[];
+  goalsSummary: { total: number; done: number };
+  milestonesSummary: { total: number; done: number };
 };
 
 export default function DashboardOrg({
   nome,
   projetos,
   relatorios,
+  goalsSummary,
+  milestonesSummary,
 }: Props) {
   // ── KPIs ──
   const totalProjetos = projetos.length;
@@ -38,15 +40,19 @@ export default function DashboardOrg({
     (r) => String(r.status ?? "").toUpperCase() === "APPROVED"
   ).length;
 
-  // ── Itens que precisam de atenção (devolvidos + rascunhos) ──
-  const precisamAtencao = relatorios
-    .filter((r) => {
-      const s = String(r.status ?? "").toUpperCase();
-      return s === "RETURNED" || s === "DRAFT";
-    })
-    .slice(0, 5);
+  // ── Execução & Metas ──
+  const pctExecucao = pct(milestonesSummary.done, milestonesSummary.total);
+  const pctMetas = pct(goalsSummary.done, goalsSummary.total);
 
-  const projetosTop = projetos.slice(0, 6);
+  // ── "O que fazer agora" — priorizado: devolvidos > rascunhos ──
+  const relatoriosParaCorrigir = relatorios
+    .filter((r) => String(r.status ?? "").toUpperCase() === "RETURNED")
+    .slice(0, 3);
+  const relatoriosParaEnviar = relatorios
+    .filter((r) => String(r.status ?? "").toUpperCase() === "DRAFT")
+    .slice(0, 3);
+
+  const projetosTop = projetos.slice(0, 5);
 
   return (
     <div className="min-w-0 space-y-6 sm:space-y-8">
@@ -76,8 +82,31 @@ export default function DashboardOrg({
         </div>
       </section>
 
-      {/* ── KPIs ── */}
-      <section className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-4">
+      {/* ── Alerta de devolvidos (topo, antes dos KPIs) ── */}
+      {relatoriosDevolvidos > 0 && (
+        <section className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+          <div className="flex items-start gap-3">
+            <span className="text-lg">⚠️</span>
+            <div>
+              <h3 className="text-sm font-semibold text-rose-900">
+                {relatoriosDevolvidos} relatório{relatoriosDevolvidos > 1 ? "s" : ""} devolvido{relatoriosDevolvidos > 1 ? "s" : ""} para ajuste
+              </h3>
+              <p className="mt-1 text-sm text-rose-700">
+                O financiador solicitou correções. Revise e reenvie para continuar a prestação de contas.
+              </p>
+              <Link
+                href="/dashboard/reports"
+                className="mt-2 inline-flex text-sm font-medium text-rose-800 underline hover:no-underline"
+              >
+                Ver relatórios devolvidos
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── KPIs — Linha 1 ── */}
+      <section className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Projetos ativos"
           value={projetosAtivos}
@@ -108,83 +137,111 @@ export default function DashboardOrg({
         />
       </section>
 
-      {/* ── Alerta de devolvidos ── */}
-      {relatoriosDevolvidos > 0 && (
-        <section className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-          <div className="flex items-start gap-3">
-            <span className="text-lg">⚠️</span>
-            <div>
-              <h3 className="text-sm font-semibold text-amber-900">
-                Você tem {relatoriosDevolvidos} relatório{relatoriosDevolvidos > 1 ? "s" : ""} devolvido{relatoriosDevolvidos > 1 ? "s" : ""}
-              </h3>
-              <p className="mt-1 text-sm text-amber-700">
-                O financiador solicitou ajustes. Revise e reenvie para continuar a prestação de contas.
-              </p>
-              <Link
-                href="/dashboard/reports"
-                className="mt-2 inline-flex text-sm font-medium text-amber-800 underline hover:no-underline"
-              >
-                Ver relatórios devolvidos
-              </Link>
-            </div>
+      {/* ── KPIs — Linha 2: Execução & Metas (P2.4) ── */}
+      <section className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2">
+        <div className="rounded-xl border bg-white p-4 shadow-sm sm:p-5">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-slate-600">Execução dos projetos</div>
+            <span className="rounded-lg bg-emerald-50 px-3 py-2 text-emerald-700">📈</span>
           </div>
+          <div className="mt-2 text-2xl font-bold text-slate-900">
+            {pctExecucao}%
+          </div>
+          <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-slate-100">
+            <div
+              className="bg-emerald-500 transition-all"
+              style={{ width: `${pctExecucao}%` }}
+            />
+          </div>
+          <p className="mt-1 text-xs text-slate-500">
+            {milestonesSummary.done} de {milestonesSummary.total} marcos concluídos
+          </p>
+        </div>
+
+        <div className="rounded-xl border bg-white p-4 shadow-sm sm:p-5">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-slate-600">Metas cumpridas</div>
+            <span className="rounded-lg bg-amber-50 px-3 py-2 text-amber-700">🎯</span>
+          </div>
+          <div className="mt-2 text-2xl font-bold text-slate-900">
+            {goalsSummary.done}
+            <span className="text-base font-normal text-slate-500">
+              {" "}/ {goalsSummary.total}
+            </span>
+          </div>
+          <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-slate-100">
+            <div
+              className="bg-amber-400 transition-all"
+              style={{ width: `${pctMetas}%` }}
+            />
+          </div>
+          <p className="mt-1 text-xs text-slate-500">
+            {pctMetas}% das metas atingidas
+          </p>
+        </div>
+      </section>
+
+      {/* ── P2.3: "O que fazer agora" ── */}
+      {(relatoriosParaCorrigir.length > 0 || relatoriosParaEnviar.length > 0) && (
+        <section className="overflow-hidden rounded-xl border bg-white">
+          <div className="border-b bg-slate-50 px-4 py-4 sm:px-6">
+            <h3 className="text-sm font-semibold text-slate-900">
+              O que fazer agora
+            </h3>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Itens que precisam da sua atenção, por prioridade.
+            </p>
+          </div>
+
+          <ul className="divide-y divide-slate-200">
+            {relatoriosParaCorrigir.map((r: any) => (
+              <li
+                key={r.id}
+                className="flex items-center justify-between gap-4 p-4 sm:px-6"
+              >
+                <div className="min-w-0">
+                  <Link
+                    href={`/dashboard/reports/${r.id}`}
+                    className="block truncate text-sm font-semibold text-blue-600 hover:underline"
+                  >
+                    {r.title || "Sem título"}
+                  </Link>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    {r.project_label || "Projeto vinculado"} · {formatarData(r.created_at)}
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700">
+                  Corrigir
+                </span>
+              </li>
+            ))}
+
+            {relatoriosParaEnviar.map((r: any) => (
+              <li
+                key={r.id}
+                className="flex items-center justify-between gap-4 p-4 sm:px-6"
+              >
+                <div className="min-w-0">
+                  <Link
+                    href={`/dashboard/reports/${r.id}`}
+                    className="block truncate text-sm font-semibold text-blue-600 hover:underline"
+                  >
+                    {r.title || "Sem título"}
+                  </Link>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    {r.project_label || "Projeto vinculado"} · {formatarData(r.created_at)}
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">
+                  Enviar
+                </span>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 
-      {/* ── Relatórios que precisam de atenção ── */}
-      <section className="overflow-hidden rounded-xl border bg-white">
-        <div className="flex flex-col gap-2 border-b bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <h3 className="text-sm font-semibold text-slate-900">
-            Relatórios que precisam da sua atenção
-          </h3>
-          <Link
-            href="/dashboard/reports"
-            className="text-sm font-medium text-blue-600 hover:underline"
-          >
-            Ver todos
-          </Link>
-        </div>
-
-        {precisamAtencao.length === 0 ? (
-          <div className="p-5 text-sm text-slate-500">
-            Tudo em dia! Nenhum relatório pendente.
-          </div>
-        ) : (
-          <ul className="divide-y divide-slate-200">
-            {precisamAtencao.map((r: any) => {
-              const s = String(r.status ?? "").toUpperCase();
-              const isReturned = s === "RETURNED";
-              return (
-                <li key={r.id} className="flex items-center justify-between gap-4 p-4 sm:px-6">
-                  <div className="min-w-0">
-                    <Link
-                      href={`/dashboard/reports/${r.id}`}
-                      className="block truncate text-sm font-semibold text-blue-600 hover:underline"
-                    >
-                      {r.title || "Sem título"}
-                    </Link>
-                    <p className="mt-0.5 truncate text-xs text-slate-500">
-                      {r.project_label || "Projeto vinculado"} · {formatarData(r.created_at)}
-                    </p>
-                  </div>
-                  <span
-                    className={[
-                      "shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium",
-                      isReturned
-                        ? "border-rose-200 bg-rose-50 text-rose-700"
-                        : "border-slate-200 bg-slate-50 text-slate-600",
-                    ].join(" ")}
-                  >
-                    {isReturned ? "Devolvido" : "Rascunho"}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
-
-      {/* ── Projetos recentes ── */}
+      {/* ── Meus projetos ── */}
       <section className="overflow-hidden rounded-xl border bg-white">
         <div className="flex flex-col gap-2 border-b bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <h3 className="text-sm font-semibold text-slate-900">

@@ -30,7 +30,7 @@ export type UserContext = {
  * Roles que você usa no app:
  * - "ORG" quando tem qualquer organization_membership
  * - "INVESTOR" quando tem qualquer investor_membership
- * - "CONSULTANT" quando tem consultant_link ativo
+ * - "CONSULTANT" quando tem project_consultant ativo
  * - Além disso, inclui o role do membership em si (ex: ORG_ADMIN / ORG_MEMBER)
  */
 function normalizeRole(role: string | null | undefined): string {
@@ -54,7 +54,9 @@ export async function getInvestorMemberships(
   userId: string
 ): Promise<InvestorMembership[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  const db = supabase as any;
+
+  const { data, error } = await db
     .from("investor_memberships")
     .select("*, investor:investors(*)")
     .eq("user_id", userId)
@@ -76,7 +78,9 @@ export async function getOrganizationMemberships(
   userId: string
 ): Promise<OrganizationMembership[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  const db = supabase as any;
+
+  const { data, error } = await db
     .from("organization_memberships")
     .select("*, organization:organizations(*)")
     .eq("user_id", userId)
@@ -110,16 +114,17 @@ export async function getCurrentOrganization(
 
 export async function getUserContext(userId: string): Promise<UserContext> {
   const supabase = createClient();
+  const db = supabase as any;
 
   const [investorMemberships, organizationMemberships, consultantLinksRes] =
     await Promise.all([
       getInvestorMemberships(userId),
       getOrganizationMemberships(userId),
-      supabase
-        .from("consultant_links")
-        .select("investor_id, consultant_user_id, is_active")
+      db
+        .from("project_consultants")
+        .select("project_id, consultant_user_id, active")
         .eq("consultant_user_id", userId)
-        .eq("is_active", true)
+        .eq("active", true)
         .limit(1),
     ]);
 
@@ -139,7 +144,7 @@ export async function getUserContext(userId: string): Promise<UserContext> {
     roles.add("INVESTOR");
     investorMemberships.forEach((m) => {
       const r = normalizeRole(m.role);
-      if (r) roles.add(r); // ex: INVESTOR_ADMIN etc (se existir)
+      if (r) roles.add(r);
     });
   }
 
@@ -148,7 +153,7 @@ export async function getUserContext(userId: string): Promise<UserContext> {
     roles.add("ORG");
     organizationMemberships.forEach((m) => {
       const r = normalizeRole(m.role);
-      if (r) roles.add(r); // ORG_ADMIN / ORG_MEMBER
+      if (r) roles.add(r);
     });
   }
 
@@ -165,7 +170,7 @@ export async function getUserContext(userId: string): Promise<UserContext> {
 }
 
 /**
- * Helpers opcionais (se você quiser usar no código depois)
+ * Helpers opcionais
  */
 export function hasRole(ctx: UserContext, role: string): boolean {
   const target = normalizeRole(role);
