@@ -66,7 +66,7 @@ function linkedEntityTypeLabel(value?: string | null) {
     .toLowerCase();
 
   if (normalized === "empresa") return "Empresa";
-  if (normalized === "entidade_publica") return "Entidade publica";
+  if (normalized === "entidade_publica") return "Órgão Público";
   return "Nao informado";
 }
 
@@ -116,7 +116,7 @@ export default function ProjectOverview({ project }: Props) {
 
           <div className="rounded-lg border border-slate-200 bg-white p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Vinculo institucional
+              Organização responsável
             </p>
             <p className="mt-1 break-words text-sm text-slate-700">
               {organizationSummary(project.organization_id)}
@@ -125,24 +125,24 @@ export default function ProjectOverview({ project }: Props) {
 
           <div className="rounded-lg border border-slate-200 bg-white p-4 md:col-span-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Entidade vinculada
+              Financiador
             </p>
             <p className="mt-1 break-words text-sm font-medium text-slate-900">
               {fallback(
                 project.linked_entity_name,
-                "Nenhuma entidade vinculada foi informada para este projeto."
+                "Nenhum financiador vinculado a este projeto."
               )}
             </p>
             <p className="mt-2 text-sm text-slate-600">
-              Tipo de vinculo:{" "}
+              Tipo:{" "}
               <span className="font-medium text-slate-900">
                 {linkedEntityTypeLabel(project.linked_entity_type)}
               </span>
             </p>
             <p className="mt-2 text-sm text-slate-600">
               {hasStructuredEntityLink
-                ? "Esta entidade esta cadastrada na organizacao e vinculada formalmente a este projeto."
-                : "Este projeto mantem o vinculo registrado no momento da criacao."}
+                ? "Financiador cadastrado e vinculado formalmente a este projeto."
+                : "Vinculo registrado no momento da criacao do projeto."}
             </p>
           </div>
 

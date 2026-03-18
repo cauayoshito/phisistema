@@ -44,105 +44,24 @@ function logDbError(tag: string, err: PostgrestErr) {
 }
 
 export async function createOrganizationAction(formData: FormData) {
-  const name = String(formData.get("name") ?? "").trim();
-
-  if (!name) {
-    redirect(
-      `/dashboard/organizations?error=${enc(
-        "Nome da organização é obrigatório."
-      )}`
-    );
-  }
-
-  const supabase = createClient();
-
-  // ✅ user real (valida no server)
-  const {
-    data: { user },
-    error: userErr,
-  } = await supabase.auth.getUser();
-
-  if (userErr || !user) {
-    redirect(`/login?error=${enc("Sessão expirada. Faça login novamente.")}`);
-  }
-
-  // ✅ session/jwt
-  const {
-    data: { session },
-    error: sessionErr,
-  } = await supabase.auth.getSession();
-
-  console.log("debug_session:", {
-    sessionErr: sessionErr?.message ?? null,
-    hasSession: !!session,
-    accessTokenLen: session?.access_token?.length ?? 0,
-    userId: user.id,
-    email: user.email ?? null,
-  });
-
-  if (!session?.access_token) {
-    redirect(
-      `/dashboard/organizations?error=${enc(
-        "Sessão sem access_token. Refaça login."
-      )}`
-    );
-  }
-
-  const db = createAuthedDbClient(session.access_token);
-
-  // 🔎 log antes do insert (o que você pediu)
-  console.log("debug_auth(app):", {
-    uid: user.id,
-    role: "authenticated",
-  });
-
-  // ✅ gera ID no app (evita depender de RETURNING/SELECT)
-  const orgId = crypto.randomUUID();
-
-  // 1) cria org
-  const { error: orgError } = await db.from("organizations").insert({
-    id: orgId,
-    name,
-  });
-
-  if (orgError) {
-    logDbError("create_org_error:", orgError as any);
-    redirect(`/dashboard/organizations?error=${enc(orgError.message)}`);
-  }
-
-  // 2) cria membership (idempotente)
-  // - se o POST rodar 2x ou se já existir, não explode
-  const { error: memberError } = await db
-    .from("organization_memberships")
-    .upsert(
-      {
-        organization_id: orgId,
-        user_id: user.id,
-        role: "ORG_ADMIN",
-      } as any,
-      {
-        onConflict: "organization_id,user_id",
-        ignoreDuplicates: true,
-      }
-    );
-
-  if (memberError) {
-    logDbError("create_membership_error:", memberError as any);
-
-    // Se for duplicado (já tinha), ignora e segue
-    if ((memberError as any)?.code === "23505") {
-      redirect(
-        `/dashboard/organizations/${orgId}?success=${enc(
-          "Organização criada."
-        )}`
-      );
-    }
-
-    redirect(`/dashboard/organizations?error=${enc(memberError.message)}`);
-  }
-
+  /**
+   * P0.4: Criação livre de organização está BLOQUEADA.
+   *
+   * Regra de negócio: organização só deve existir vinculada a um financiador.
+   * O fluxo correto é: financiador convida → organização aceita → org é criada.
+   *
+   * DÍVIDA TÉCNICA (P1):
+   * - Criar tabela organization_investor_links
+   * - Implementar fluxo de convite completo (financiador → org)
+   * - Implementar fluxo de solicitação (org → financiador)
+   * - Ao aceitar convite, criar org + link + membership numa transação
+   *
+   * Por ora, redireciona com mensagem explicativa.
+   */
   redirect(
-    `/dashboard/organizations/${orgId}?success=${enc("Organização criada.")}`
+    `/dashboard/organizations?error=${enc(
+      "A criação direta de organização foi desativada. Para operar na plataforma, sua organização precisa ser vinculada por um financiador. Solicite um convite ao financiador responsável."
+    )}`
   );
 }
 

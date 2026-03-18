@@ -192,7 +192,7 @@ export async function createProject(
   const linkedEntityId = String(payload.linked_entity_id ?? "").trim();
 
   if (!linkedEntityId) {
-    throw new Error("Selecione uma entidade cadastrada para criar o projeto.");
+    throw new Error("Selecione um financiador cadastrado para criar o projeto.");
   }
 
   const linkedEntity = await getInstitutionalEntityByIdForOrganization(
@@ -202,12 +202,12 @@ export async function createProject(
 
   if (!linkedEntity) {
     throw new Error(
-      "Selecione uma entidade cadastrada da organizacao para continuar."
+      "Selecione um financiador cadastrado da organizacao para continuar."
     );
   }
 
   if (String(linkedEntity.status ?? "").toUpperCase() !== "ACTIVE") {
-    throw new Error("A entidade selecionada nao esta ativa para novos projetos.");
+    throw new Error("O financiador selecionado nao esta ativo para novos projetos.");
   }
 
   const linkedEntityName = String(linkedEntity.display_name ?? "").trim();
@@ -217,7 +217,7 @@ export async function createProject(
 
   if (!linkedEntityName || !linkedEntityType) {
     throw new Error(
-      "A entidade selecionada nao possui dados suficientes para vincular o projeto."
+      "O financiador selecionado nao possui dados suficientes para vincular ao projeto."
     );
   }
 

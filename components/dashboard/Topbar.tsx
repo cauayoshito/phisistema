@@ -5,8 +5,8 @@
 };
 
 export default function Topbar({
-  title = "Visão Geral",
-  subtitle = "Acompanhe rapidamente seus dados e atalhos.",
+  title = "Transparência Social",
+  subtitle = "Gestão de parcerias e prestação de contas.",
   onOpenMenu,
 }: Props) {
   return (

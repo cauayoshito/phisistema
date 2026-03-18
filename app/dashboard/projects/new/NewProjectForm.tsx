@@ -37,7 +37,7 @@ function entityTypeLabel(value?: string | null) {
     .toLowerCase();
 
   if (normalized === "empresa") return "Empresa";
-  if (normalized === "entidade_publica") return "Entidade publica";
+  if (normalized === "entidade_publica") return "Órgão Público";
   return "Tipo nao informado";
 }
 
@@ -71,8 +71,8 @@ export default function NewProjectForm({
           Dados iniciais do projeto
         </h2>
         <p className="mt-1 text-sm text-slate-600">
-          Todo projeto precisa nascer associado a uma empresa ou entidade
-          publica cadastrada na organizacao.
+          Todo projeto precisa nascer associado a um financiador
+          cadastrado na organizacao.
         </p>
       </div>
 
@@ -139,7 +139,7 @@ export default function NewProjectForm({
 
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-slate-700">
-              Entidade vinculada
+              Financiador vinculado
             </label>
             <select
               name="linked_entity_id"
@@ -150,8 +150,8 @@ export default function NewProjectForm({
             >
               <option value="" disabled>
                 {filteredEntities.length === 0
-                  ? "Nenhuma entidade ativa nesta organizacao"
-                  : "Selecione uma entidade cadastrada"}
+                  ? "Nenhum financiador ativo nesta organizacao"
+                  : "Selecione o financiador"}
               </option>
 
               {filteredEntities.map((entity) => (
@@ -162,21 +162,13 @@ export default function NewProjectForm({
             </select>
 
             <p className="mt-2 text-xs text-slate-500">
-              Ao trocar de organizacao, a entidade selecionada e limpa para
-              evitar vinculos inconsistentes. Se a entidade ainda nao estiver
-              disponivel, cadastre primeiro em{" "}
-              <Link
-                href="/dashboard/entities"
-                className="font-medium text-blue-600 hover:underline"
-              >
-                Entidades
-              </Link>
-              .
+              Ao trocar de organizacao, o financiador selecionado e limpo para
+              evitar vinculos inconsistentes.
             </p>
 
             {selectedOrganizationId && filteredEntities.length === 0 && (
               <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                Esta organizacao ainda nao possui entidades ativas cadastradas.
+                Esta organizacao ainda nao possui financiadores ativos cadastrados.
               </div>
             )}
           </div>
@@ -206,9 +198,8 @@ export default function NewProjectForm({
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-          Ao criar o projeto, o sistema registra o vinculo estruturado com a
-          entidade selecionada e salva o snapshot do nome e do tipo dessa
-          entidade no proprio projeto.
+          Ao criar o projeto, o sistema registra o vinculo com o financiador
+          selecionado e salva os dados de identificacao no proprio projeto.
         </div>
 
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">

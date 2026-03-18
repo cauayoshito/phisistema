@@ -1,7 +1,12 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { listProjectsForUser } from "@/services/projects.service";
+import {
+  getUserContext,
+  getOrganizationMemberships,
+} from "@/services/membership.service";
+import { getPrimaryRole } from "@/lib/roles";
 import { PROJECT_STATUS_LABEL, type ProjectStatus } from "@/lib/status";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +43,12 @@ function normalizeProjectType(value: string) {
     return v;
   }
   return "ALL";
+}
+
+function normalizeRole(value: unknown) {
+  return String(value ?? "")
+    .trim()
+    .toUpperCase();
 }
 
 function projectTypeLabel(v: string) {
@@ -102,6 +113,27 @@ export default async function ProjectsPage({ searchParams }: Props) {
 
   if (!user) redirect("/login");
 
+  let role: ReturnType<typeof getPrimaryRole> = "ORG";
+  let canCreateProject = false;
+
+  try {
+    const [ctx, memberships] = await Promise.all([
+      getUserContext(user.id),
+      getOrganizationMemberships(user.id),
+    ]);
+
+    role = getPrimaryRole(ctx);
+
+    const hasOrgAdminMembership = memberships.some(
+      (membership) => normalizeRole(membership.role) === "ORG_ADMIN"
+    );
+
+    canCreateProject = role === "ORG" && hasOrgAdminMembership;
+  } catch {
+    // fallback seguro: não libera criação sem validar
+    canCreateProject = false;
+  }
+
   const q = readString(searchParams?.q);
   const type = normalizeProjectType(readString(searchParams?.type));
   const errorMessage = getSearchMessage(searchParams?.error);
@@ -137,6 +169,8 @@ export default async function ProjectsPage({ searchParams }: Props) {
     return s ? `/dashboard/projects?${s}` : "/dashboard/projects";
   };
 
+  const actionLabel = role === "ORG" ? "Abrir" : "Visualizar";
+
   return (
     <main className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -145,16 +179,22 @@ export default async function ProjectsPage({ searchParams }: Props) {
             Projetos
           </h1>
           <p className="mt-1 text-sm text-slate-600">
-            Gerencie e acompanhe todos os seus projetos filantrópicos.
+            {role === "INVESTOR"
+              ? "Projetos das organizações vinculadas ao seu perfil."
+              : role === "CONSULTANT"
+              ? "Projetos sob sua gestão como consultor."
+              : "Gerencie e acompanhe seus projetos."}
           </p>
         </div>
 
-        <Link
-          href="/dashboard/projects/new"
-          className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 sm:w-auto"
-        >
-          Novo Projeto
-        </Link>
+        {canCreateProject && (
+          <Link
+            href="/dashboard/projects/new"
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 sm:w-auto"
+          >
+            Novo Projeto
+          </Link>
+        )}
       </header>
 
       {errorMessage && (
@@ -285,7 +325,7 @@ export default async function ProjectsPage({ searchParams }: Props) {
                   href={`/dashboard/projects/${p.id}?tab=overview`}
                   className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-blue-600 transition hover:bg-slate-50"
                 >
-                  Abrir
+                  {actionLabel}
                 </Link>
               </div>
             </div>
@@ -354,7 +394,7 @@ export default async function ProjectsPage({ searchParams }: Props) {
                       href={`/dashboard/projects/${p.id}?tab=overview`}
                       className="text-blue-600 hover:underline"
                     >
-                      Abrir
+                      {actionLabel}
                     </Link>
                   </td>
                 </tr>

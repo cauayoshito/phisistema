@@ -1,8 +1,9 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { requireUser } from "@/services/auth.service";
+import { getUserContext } from "@/services/membership.service";
 import { getOrganizationMemberships } from "@/services/membership.service";
 import { listOrganizationsForUser } from "@/services/organizations.service";
-import { createOrganizationAction } from "@/app/actions/organizations.actions";
+import { getPrimaryRole } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,15 @@ export default async function DashboardOrganizationsPage({
   const error = msg(searchParams?.error);
   const success = msg(searchParams?.success);
 
+  // Resolve perfil
+  let role: ReturnType<typeof getPrimaryRole> = "ORG";
+  try {
+    const ctx = await getUserContext(user.id);
+    role = getPrimaryRole(ctx);
+  } catch {
+    // fallback ORG
+  }
+
   const memberships = await getOrganizationMemberships(user.id);
   const orgIds = (memberships ?? []).map((m) => m.organization_id);
   const orgs = orgIds.length > 0 ? await listOrganizationsForUser(orgIds) : [];
@@ -52,9 +62,15 @@ export default async function DashboardOrganizationsPage({
     <main className="mx-auto max-w-5xl p-6 space-y-6">
       <header className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Organizações</h1>
+          <h1 className="text-2xl font-bold text-slate-900">
+            {role === "INVESTOR" ? "Organizações vinculadas" : "Minha Organização"}
+          </h1>
           <p className="text-sm text-slate-600">
-            Gerencie suas organizações e acesse documentos e questionários.
+            {role === "INVESTOR"
+              ? "Organizações sociais vinculadas ao seu perfil de financiador."
+              : role === "CONSULTANT"
+              ? "Organizações dos projetos sob sua gestão."
+              : "Gerencie os dados da sua organização."}
           </p>
         </div>
 
@@ -78,98 +94,43 @@ export default async function DashboardOrganizationsPage({
         </div>
       )}
 
-      {orgs.length === 0 ? (
-        <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="space-y-2">
-            <h2 className="text-lg font-semibold text-slate-900">
-              Você ainda não tem organização
-            </h2>
-            <p className="text-sm text-slate-600">
-              Para continuar na Transparência Social, crie uma organização ou
-              entre por convite.
-            </p>
-          </div>
-
-          <form action={createOrganizationAction} className="mt-5 space-y-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                Nome da organização
-              </label>
-              <input
-                name="name"
-                required
-                placeholder="Ex: Instituto Comunidade Viva"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
-              />
-            </div>
-
-            <button className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">
-              Criar organização
-            </button>
-          </form>
-
-          <div className="mt-4 text-xs text-slate-500">
-            Se você recebeu um convite, use o link enviado por e-mail para
-            entrar na organização.
-          </div>
-        </section>
-      ) : (
+      {/* ── INVESTOR: vê organizações vinculadas, não cria ── */}
+      {role === "INVESTOR" && (
         <>
-          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-              <div>
+          {orgs.length === 0 ? (
+            <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-slate-900">
+                Nenhuma organização vinculada
+              </h2>
+              <p className="mt-2 text-sm text-slate-600">
+                Você ainda não tem organizações sociais vinculadas ao seu perfil.
+                Use o sistema de convites para vincular organizações aos seus projetos.
+              </p>
+            </section>
+          ) : (
+            <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-200 px-5 py-4">
                 <h2 className="font-semibold text-slate-900">
-                  Minhas organizações
+                  Organizações na sua carteira
                 </h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  Escolha uma organização para visualizar dados, documentos e
-                  questionários.
+                <p className="mt-1 text-sm text-slate-500">
+                  {orgs.length} organização{orgs.length > 1 ? "ões" : ""} vinculada{orgs.length > 1 ? "s" : ""}.
                 </p>
               </div>
-
-              <form
-                action={createOrganizationAction}
-                className="flex w-full flex-col gap-2 sm:flex-row md:w-auto"
-              >
-                <input
-                  name="name"
-                  required
-                  placeholder="Nova organização..."
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm sm:w-72"
-                />
-                <button className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">
-                  Criar
-                </button>
-              </form>
-            </div>
-          </section>
-
-          <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <ul className="divide-y divide-slate-200">
-              {orgs.map((org) => {
-                const role = membershipMap.get(org.id);
-
-                return (
+              <ul className="divide-y divide-slate-200">
+                {orgs.map((org) => (
                   <li
                     key={org.id}
                     className="flex items-center justify-between gap-4 p-5"
                   >
                     <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="truncate text-base font-semibold text-slate-900">
-                          {org.name}
-                        </h3>
-
-                        <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
-                          {membershipRoleLabel(role)}
-                        </span>
-                      </div>
-
+                      <h3 className="truncate text-base font-semibold text-slate-900">
+                        {org.name}
+                      </h3>
                       <p className="mt-1 text-sm text-slate-500">
                         Identificador: {shortId(org.id)}
                       </p>
                     </div>
-
                     <Link
                       href={`/dashboard/organizations/${org.id}`}
                       className="shrink-0 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
@@ -177,10 +138,116 @@ export default async function DashboardOrganizationsPage({
                       Abrir
                     </Link>
                   </li>
-                );
-              })}
-            </ul>
-          </section>
+                ))}
+              </ul>
+            </section>
+          )}
+        </>
+      )}
+
+      {/* ── CONSULTANT: visão somente leitura ── */}
+      {role === "CONSULTANT" && (
+        <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900">
+            Acesso de consultor
+          </h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Como consultor, você acompanha organizações através dos projetos
+            vinculados ao seu perfil. Acesse os projetos pelo menu lateral para
+            ver os dados das organizações associadas.
+          </p>
+          <Link
+            href="/dashboard/projects"
+            className="mt-4 inline-flex rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Ver meus projetos
+          </Link>
+        </section>
+      )}
+
+      {/* ── ORG: vê sua organização, sem criação livre ── */}
+      {role === "ORG" && (
+        <>
+          {orgs.length === 0 ? (
+            <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="space-y-2">
+                <h2 className="text-lg font-semibold text-slate-900">
+                  Você ainda não está vinculado a uma organização
+                </h2>
+                <p className="text-sm text-slate-600">
+                  Para operar na Transparência Social, sua organização precisa
+                  ser vinculada a um financiador. Solicite um convite ao
+                  financiador responsável ou aguarde ser adicionado.
+                </p>
+              </div>
+
+              <div className="mt-5 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                <h3 className="text-sm font-semibold text-blue-900">
+                  Como funciona?
+                </h3>
+                <p className="mt-1 text-sm text-blue-800">
+                  O financiador (empresa) envia um convite por e-mail com um link
+                  de aceite. Ao aceitar, sua organização fica automaticamente
+                  vinculada e você poderá criar projetos e relatórios.
+                </p>
+              </div>
+
+              <div className="mt-4 text-xs text-slate-500">
+                Se você recebeu um convite, use o link enviado por e-mail para
+                entrar na organização.
+              </div>
+            </section>
+          ) : (
+            <>
+              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h2 className="font-semibold text-slate-900">
+                  Minhas organizações
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Escolha uma organização para visualizar dados, documentos e
+                  questionários.
+                </p>
+              </section>
+
+              <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <ul className="divide-y divide-slate-200">
+                  {orgs.map((org) => {
+                    const orgRole = membershipMap.get(org.id);
+
+                    return (
+                      <li
+                        key={org.id}
+                        className="flex items-center justify-between gap-4 p-5"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="truncate text-base font-semibold text-slate-900">
+                              {org.name}
+                            </h3>
+
+                            <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
+                              {membershipRoleLabel(orgRole)}
+                            </span>
+                          </div>
+
+                          <p className="mt-1 text-sm text-slate-500">
+                            Identificador: {shortId(org.id)}
+                          </p>
+                        </div>
+
+                        <Link
+                          href={`/dashboard/organizations/${org.id}`}
+                          className="shrink-0 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                        >
+                          Abrir
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            </>
+          )}
         </>
       )}
     </main>

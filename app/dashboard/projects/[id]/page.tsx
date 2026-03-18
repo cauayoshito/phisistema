@@ -174,6 +174,13 @@ export default async function DashboardProjectDetailPage({
   const isOrgUser = ctx.roles.includes("ORG");
   const consultant = isConsultant(ctx);
 
+  const isLockedForOrg =
+    isOrgUser &&
+    (status === "ENVIADO" || status === "EM_ANALISE" || status === "APROVADO");
+
+  const canEditProjectContent =
+    isOrgUser && (status === "DRAFT" || status === "DEVOLVIDO");
+
   const canStartReview = status === "ENVIADO" && consultant;
   const canResubmit = status === "DEVOLVIDO" && isOrgUser;
   const canSubmit = status === "DRAFT" && isOrgUser;
@@ -192,6 +199,7 @@ export default async function DashboardProjectDetailPage({
   const isOrgAdmin = normalizeRole(currentOrgMembership?.role) === "ORG_ADMIN";
 
   const canManageParticipants = isProjectOwner || isOrgAdmin;
+  const canEditParticipants = canManageParticipants && canEditProjectContent;
 
   const errorMessage = readQueryValue(searchParams?.error);
   const successMessage = readQueryValue(searchParams?.success);
@@ -308,6 +316,14 @@ export default async function DashboardProjectDetailPage({
           </form>
         )}
 
+        {isLockedForOrg && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            Projeto enviado para análise. A edição do conteúdo e dos
+            participantes está temporariamente bloqueada até nova devolução ou
+            conclusão da análise.
+          </div>
+        )}
+
         {!hasStatusActions && (
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
             {statusNote}
@@ -340,23 +356,45 @@ export default async function DashboardProjectDetailPage({
 
             <ProjectParticipants
               projectId={String(project.id)}
-              canManage={canManageParticipants}
+              canManage={canEditParticipants}
               organizationMembers={organizationMembers as any[]}
               participants={participants as any[]}
             />
           </div>
         )}
 
-        {tab === "plan" && <ProjectPlan project={project as any} />}
+        {tab === "plan" &&
+          (isLockedForOrg ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+              Este projeto já foi enviado para análise. A aba de planejamento
+              está em modo de visualização até nova devolução.
+            </div>
+          ) : (
+            <ProjectPlan project={project as any} />
+          ))}
 
-        {tab === "financial" && <ProjectFinancial project={project as any} />}
+        {tab === "financial" &&
+          (isLockedForOrg ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+              Este projeto já foi enviado para análise. A aba financeira está em
+              modo de visualização até nova devolução.
+            </div>
+          ) : (
+            <ProjectFinancial project={project as any} />
+          ))}
 
-        {tab === "documents" && (
-          <ProjectDocuments
-            projectId={String(project.id)}
-            projectType={String(projectType)}
-          />
-        )}
+        {tab === "documents" &&
+          (isLockedForOrg ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+              Este projeto já foi enviado para análise. O envio de novos
+              documentos está temporariamente bloqueado.
+            </div>
+          ) : (
+            <ProjectDocuments
+              projectId={String(project.id)}
+              projectType={String(projectType)}
+            />
+          ))}
 
         {tab === "reports" && (
           <ProjectReports

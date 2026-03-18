@@ -219,8 +219,8 @@ export default function HelpPage() {
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <ModuleCard
             title="Organizações"
-            description="Cadastre dados institucionais, membros, questionário e documentos obrigatórios da organização."
-            highlight="Base institucional"
+            description="Cadastre dados da organização, membros e documentos obrigatórios."
+            highlight="Dados da organização"
           />
 
           <ModuleCard

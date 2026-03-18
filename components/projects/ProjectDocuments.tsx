@@ -56,7 +56,7 @@ export default function ProjectDocuments({ projectId }: Props) {
 
   const checklist = useMemo(
     () => [
-      "Documentação institucional",
+      "Documentação da organização",
       "Projeto ou proposta",
       "Comprovantes e anexos financeiros",
     ],

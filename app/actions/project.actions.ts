@@ -56,7 +56,7 @@ export async function createProjectAction(formData: FormData) {
     if (!linkedEntityId) {
       redirect(
         `/dashboard/projects/new?error=${enc(
-          "Selecione uma entidade cadastrada da organizacao."
+          "Selecione um financiador cadastrado da organizacao."
         )}`
       );
     }
@@ -98,7 +98,7 @@ export async function createProjectAction(formData: FormData) {
     const message =
       error instanceof Error && error.message
         ? error.message
-        : "Nao foi possivel criar o projeto agora. Revise a entidade vinculada e tente novamente.";
+        : "Nao foi possivel criar o projeto agora. Revise o financiador vinculado e tente novamente.";
 
     redirect(`/dashboard/projects/new?error=${enc(message)}`);
   }

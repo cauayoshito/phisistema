@@ -3,9 +3,13 @@ import { redirect } from "next/navigation";
 import { isRedirectError } from "next/dist/client/components/redirect";
 import NewProjectForm from "./NewProjectForm";
 import { requireUser } from "@/services/auth.service";
+import {
+  getUserContext,
+  getOrganizationMemberships,
+} from "@/services/membership.service";
 import { listInstitutionalEntitiesForOrganizations } from "@/services/institutional-entities.service";
-import { getOrganizationMemberships } from "@/services/membership.service";
 import { createProject } from "@/services/projects.service";
+import { getPrimaryRole } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -35,14 +39,18 @@ function normalizeProjectType(raw: string): ProjectType {
   return "INCENTIVADO";
 }
 
-function roleLabel(value: string | null | undefined) {
-  const normalized = String(value ?? "")
+function normalizeRole(value: unknown) {
+  return String(value ?? "")
     .trim()
     .toUpperCase();
+}
+
+function roleLabel(value: string | null | undefined) {
+  const normalized = normalizeRole(value);
 
   if (normalized === "ORG_ADMIN") return "Administrador";
   if (normalized === "ORG_MEMBER") return "Membro";
-  return "Vinculo";
+  return "Vínculo";
 }
 
 function getInitialMetadataByProjectType(projectType: ProjectType) {
@@ -199,7 +207,47 @@ function getInitialMetadataByProjectType(projectType: ProjectType) {
 async function createProjectAction(formData: FormData) {
   "use server";
 
-  await requireUser();
+  const user = await requireUser();
+
+  try {
+    const [ctx, memberships] = await Promise.all([
+      getUserContext(user.id),
+      getOrganizationMemberships(user.id),
+    ]);
+
+    const userRole = getPrimaryRole(ctx);
+    const organizationId = String(formData.get("organization_id") ?? "").trim();
+
+    if (userRole !== "ORG") {
+      redirect(
+        `/dashboard/projects?error=${encodeMsg(
+          "Apenas organizações sociais podem criar projetos."
+        )}`
+      );
+    }
+
+    const membership = memberships.find(
+      (item) => item.organization_id === organizationId
+    );
+
+    const membershipRole = normalizeRole(membership?.role);
+
+    if (membershipRole !== "ORG_ADMIN") {
+      redirect(
+        `/dashboard/projects?error=${encodeMsg(
+          "Apenas administradores da organização podem criar projetos."
+        )}`
+      );
+    }
+  } catch (error) {
+    if (isRedirectError(error)) throw error;
+
+    redirect(
+      `/dashboard/projects?error=${encodeMsg(
+        "Não foi possível validar suas permissões para criar o projeto."
+      )}`
+    );
+  }
 
   const title = String(formData.get("title") ?? "").trim();
   const projectType = normalizeProjectType(
@@ -218,7 +266,7 @@ async function createProjectAction(formData: FormData) {
   if (!organizationId) {
     redirect(
       `/dashboard/projects/new?error=${encodeMsg(
-        "Voce precisa estar vinculado a uma organizacao para criar um projeto."
+        "Você precisa estar vinculado a uma organização para criar um projeto."
       )}`
     );
   }
@@ -226,7 +274,7 @@ async function createProjectAction(formData: FormData) {
   if (!linkedEntityId) {
     redirect(
       `/dashboard/projects/new?error=${encodeMsg(
-        "Selecione uma entidade cadastrada da organizacao."
+        "Selecione um financiador cadastrado da organização."
       )}`
     );
   }
@@ -252,7 +300,7 @@ async function createProjectAction(formData: FormData) {
     const message =
       error instanceof Error && error.message
         ? error.message
-        : "Nao foi possivel criar o projeto agora. Revise a entidade vinculada e tente novamente.";
+        : "Não foi possível criar o projeto agora. Revise o financiador vinculado e tente novamente.";
 
     redirect(`/dashboard/projects/new?error=${encodeMsg(message)}`);
   }
@@ -260,13 +308,45 @@ async function createProjectAction(formData: FormData) {
 
 export default async function NewProjectPage({ searchParams }: Props) {
   const user = await requireUser();
+
+  let role: ReturnType<typeof getPrimaryRole> = "ORG";
+  try {
+    const ctx = await getUserContext(user.id);
+    role = getPrimaryRole(ctx);
+  } catch {
+    // fallback ORG
+  }
+
+  if (role !== "ORG") {
+    redirect(
+      `/dashboard/projects?error=${encodeMsg(
+        "Apenas organizações sociais podem criar projetos."
+      )}`
+    );
+  }
+
   const memberships = await getOrganizationMemberships(user.id);
 
+  const adminMemberships = memberships.filter(
+    (membership) => normalizeRole(membership.role) === "ORG_ADMIN"
+  );
+
+  if (adminMemberships.length === 0) {
+    redirect(
+      `/dashboard/projects?error=${encodeMsg(
+        "Apenas administradores da organização podem criar projetos."
+      )}`
+    );
+  }
+
   const errorMessage = readQueryValue(searchParams?.error);
-  const availableOrganizations = memberships.filter((membership) =>
+
+  const availableOrganizations = adminMemberships.filter((membership) =>
     Boolean(membership.organization_id)
   );
+
   const hasOrganizations = availableOrganizations.length > 0;
+
   const organizationIds = availableOrganizations
     .map((membership) => membership.organization_id)
     .filter(Boolean) as string[];
@@ -279,19 +359,15 @@ export default async function NewProjectPage({ searchParams }: Props) {
   const activeEntities = institutionalEntities.filter(
     (entity) => String(entity.status ?? "").toUpperCase() === "ACTIVE"
   );
+
   const hasEntities = activeEntities.length > 0;
 
-  const defaultOrgId =
-    availableOrganizations.find(
-      (membership) => String(membership.role ?? "").toUpperCase() === "ORG_ADMIN"
-    )?.organization_id ??
-    availableOrganizations[0]?.organization_id ??
-    "";
+  const defaultOrgId = availableOrganizations[0]?.organization_id ?? "";
 
   const organizationOptions = availableOrganizations.map((membership) => ({
     id: membership.organization_id,
     label:
-      (membership.organization?.name ?? "Organizacao sem nome") +
+      (membership.organization?.name ?? "Organização sem nome") +
       " - " +
       roleLabel(membership.role),
   }));
@@ -311,8 +387,8 @@ export default async function NewProjectPage({ searchParams }: Props) {
             Novo projeto
           </h1>
           <p className="text-sm text-slate-600">
-            Escolha o modelo do projeto e selecione a entidade cadastrada que
-            ficara vinculada a ele desde a criacao.
+            Escolha o modelo do projeto e selecione o financiador que ficará
+            vinculado a ele desde a criação.
           </p>
         </div>
 
@@ -332,19 +408,16 @@ export default async function NewProjectPage({ searchParams }: Props) {
 
       {!hasOrganizations && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          Voce ainda nao tem vinculo com uma organizacao. Peca acesso a um
-          administrador para poder criar projetos.
+          Você ainda não tem vínculo administrativo com uma organização. Peça
+          acesso a um administrador para poder criar projetos.
         </div>
       )}
 
       {hasOrganizations && !hasEntities && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          Nenhuma empresa ou entidade publica foi cadastrada ainda para suas
-          organizacoes. Cadastre a primeira em{" "}
-          <Link href="/dashboard/entities" className="font-medium underline">
-            Entidades
-          </Link>{" "}
-          antes de criar um projeto.
+          Nenhum financiador (empresa ou órgão público) foi cadastrado ainda
+          para suas organizações. Entre em contato com o administrador para
+          vincular um financiador antes de criar um projeto.
         </div>
       )}
 
@@ -357,14 +430,14 @@ export default async function NewProjectPage({ searchParams }: Props) {
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="font-semibold text-slate-900">Recursos Publicos</h2>
+          <h2 className="font-semibold text-slate-900">Recursos Públicos</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Projetos celebrados com o poder publico.
+            Projetos celebrados com o poder público.
           </p>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="font-semibold text-slate-900">Recursos Proprios</h2>
+          <h2 className="font-semibold text-slate-900">Recursos Próprios</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
             Projetos que buscam apoio financeiro de empresas.
           </p>

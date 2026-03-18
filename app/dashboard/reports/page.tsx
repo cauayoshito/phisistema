@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/services/auth.service";
+import { getUserContext } from "@/services/membership.service";
+import { getPrimaryRole } from "@/lib/roles";
 import {
   listProjectsForUserReports,
   listReportsForUser,
@@ -16,21 +18,15 @@ export const dynamic = "force-dynamic";
 
 function formatDate(iso: string | null | undefined) {
   if (!iso) return "-";
-
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "-";
-
-  return new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "short",
-  }).format(d);
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(d);
 }
 
 function formatDateTime(iso: string | null | undefined) {
   if (!iso) return "-";
-
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "-";
-
   return new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "short",
     timeStyle: "short",
@@ -57,26 +53,17 @@ function getCurrentMonthDefaults() {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
-
   const firstDay = new Date(year, month, 1);
   const lastDay = new Date(year, month + 1, 0);
-
-  return {
-    start: toIsoDateLocal(firstDay),
-    end: toIsoDateLocal(lastDay),
-  };
+  return { start: toIsoDateLocal(firstDay), end: toIsoDateLocal(lastDay) };
 }
 
 function badgeClass(status: string) {
   const s = status.toUpperCase();
-
   if (s === "DRAFT") return "bg-blue-50 text-blue-700 border-blue-200";
   if (s === "SUBMITTED") return "bg-amber-50 text-amber-700 border-amber-200";
-  if (s === "APPROVED") {
-    return "bg-emerald-50 text-emerald-700 border-emerald-200";
-  }
+  if (s === "APPROVED") return "bg-emerald-50 text-emerald-700 border-emerald-200";
   if (s === "RETURNED") return "bg-rose-50 text-rose-700 border-rose-200";
-
   return "bg-slate-50 text-slate-700 border-slate-200";
 }
 
@@ -93,6 +80,15 @@ async function doDelete(reportId: string) {
 export default async function DashboardReportsPage() {
   const user = await requireUser();
 
+  // Resolver perfil
+  let role: ReturnType<typeof getPrimaryRole> = "ORG";
+  try {
+    const ctx = await getUserContext(user.id);
+    role = getPrimaryRole(ctx);
+  } catch {
+    // fallback ORG
+  }
+
   const [projects, reports] = await Promise.all([
     listProjectsForUserReports(user.id),
     listReportsForUser(user.id),
@@ -100,15 +96,32 @@ export default async function DashboardReportsPage() {
 
   const defaults = getCurrentMonthDefaults();
 
+  // Títulos e descrições por perfil
+  const pageTitle =
+    role === "INVESTOR"
+      ? "Relatórios recebidos"
+      : role === "CONSULTANT"
+      ? "Relatórios para revisão"
+      : "Meus Relatórios";
+
+  const pageDescription =
+    role === "INVESTOR"
+      ? "Relatórios submetidos pelas organizações vinculadas. Avalie e aprove."
+      : role === "CONSULTANT"
+      ? "Relatórios dos projetos sob sua gestão. Revise e emita pareceres."
+      : "Crie e gerencie relatórios vinculados aos projetos da sua organização.";
+
+  // Ações por perfil
+  const canCreate = role === "ORG";
+  const canDuplicate = role === "ORG";
+  const canDelete = role === "ORG";
+
   return (
     <main className="mx-auto max-w-6xl p-6 space-y-6">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Relatórios</h1>
-          <p className="text-sm text-slate-600">
-            Crie e gerencie relatórios vinculados aos projetos da sua
-            organização.
-          </p>
+          <h1 className="text-2xl font-bold text-slate-900">{pageTitle}</h1>
+          <p className="text-sm text-slate-600">{pageDescription}</p>
         </div>
 
         <Link
@@ -119,105 +132,113 @@ export default async function DashboardReportsPage() {
         </Link>
       </header>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="mb-4">
-          <h2 className="font-semibold text-slate-900">Criar relatório</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Selecione o projeto e o período para iniciar um novo relatório.
-          </p>
-        </div>
-
-        <form action={createReportAction} className="grid gap-4 sm:grid-cols-6">
-          <div className="sm:col-span-3">
-            <label className="mb-1 block text-xs font-medium text-slate-600">
-              Projeto
-            </label>
-            <select
-              name="project_id"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
-              required
-            >
-              <option value="">Selecione...</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
+      {/* ── Formulário de criação — SOMENTE ORG ── */}
+      {canCreate && (
+        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-4">
+            <h2 className="font-semibold text-slate-900">Criar relatório</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Selecione o projeto e o período para iniciar um novo relatório.
+            </p>
           </div>
 
-          <div className="sm:col-span-3">
-            <label className="mb-1 block text-xs font-medium text-slate-600">
-              Título (opcional)
-            </label>
-            <input
-              name="title"
-              placeholder="Ex: Relatório Mensal"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
-            />
-          </div>
+          <form action={createReportAction} className="grid gap-4 sm:grid-cols-6">
+            <div className="sm:col-span-3">
+              <label className="mb-1 block text-xs font-medium text-slate-600">
+                Projeto
+              </label>
+              <select
+                name="project_id"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
+                required
+              >
+                <option value="">Selecione...</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          <div className="sm:col-span-2">
-            <label className="mb-1 block text-xs font-medium text-slate-600">
-              Tipo
-            </label>
-            <select
-              name="period_type"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
-              defaultValue="MONTHLY"
-            >
-              <option value="MONTHLY">Mensal</option>
-            </select>
-          </div>
+            <div className="sm:col-span-3">
+              <label className="mb-1 block text-xs font-medium text-slate-600">
+                Título (opcional)
+              </label>
+              <input
+                name="title"
+                placeholder="Ex: Relatório Mensal"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
+              />
+            </div>
 
-          <div className="sm:col-span-2">
-            <label className="mb-1 block text-xs font-medium text-slate-600">
-              Início
-            </label>
-            <input
-              name="period_start"
-              type="date"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
-              defaultValue={defaults.start}
-              required
-            />
-          </div>
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-xs font-medium text-slate-600">
+                Tipo
+              </label>
+              <select
+                name="period_type"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
+                defaultValue="MONTHLY"
+              >
+                <option value="MONTHLY">Mensal</option>
+              </select>
+            </div>
 
-          <div className="sm:col-span-2">
-            <label className="mb-1 block text-xs font-medium text-slate-600">
-              Fim
-            </label>
-            <input
-              name="period_end"
-              type="date"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
-              defaultValue={defaults.end}
-              required
-            />
-          </div>
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-xs font-medium text-slate-600">
+                Início
+              </label>
+              <input
+                name="period_start"
+                type="date"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
+                defaultValue={defaults.start}
+                required
+              />
+            </div>
 
-          <div className="sm:col-span-6">
-            <button
-              className="inline-flex w-full items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700"
-              type="submit"
-            >
-              Criar relatório
-            </button>
-          </div>
-        </form>
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-xs font-medium text-slate-600">
+                Fim
+              </label>
+              <input
+                name="period_end"
+                type="date"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
+                defaultValue={defaults.end}
+                required
+              />
+            </div>
 
-        {projects.length === 0 && (
-          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Você não tem projetos visíveis para criar relatórios no momento.
-          </div>
-        )}
-      </section>
+            <div className="sm:col-span-6">
+              <button
+                className="inline-flex w-full items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700"
+                type="submit"
+              >
+                Criar relatório
+              </button>
+            </div>
+          </form>
 
+          {projects.length === 0 && (
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Você não tem projetos visíveis para criar relatórios no momento.
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ── Tabela de relatórios ── */}
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
-          <h2 className="font-semibold text-slate-900">Relatórios criados</h2>
+          <h2 className="font-semibold text-slate-900">
+            {canCreate ? "Relatórios criados" : "Lista de relatórios"}
+          </h2>
           <p className="mt-1 text-sm text-slate-600">
-            Acompanhe, duplique ou exclua relatórios existentes.
+            {canCreate
+              ? "Acompanhe, duplique ou exclua relatórios existentes."
+              : "Clique em Abrir para visualizar ou avaliar o relatório."}
           </p>
         </div>
 
@@ -249,7 +270,7 @@ export default async function DashboardReportsPage() {
             <tbody>
               {(reports ?? []).map((r: any) => {
                 const status = String(r.status ?? "");
-                const canDelete = status === "DRAFT";
+                const isDraft = status.toUpperCase() === "DRAFT";
                 const statusLabel =
                   REPORT_STATUS_LABEL[r.status as ReportStatus] ?? status;
 
@@ -292,27 +313,31 @@ export default async function DashboardReportsPage() {
                           href={`/dashboard/reports/${r.id}`}
                           className="rounded bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
                         >
-                          Abrir
+                          {role === "ORG" ? "Abrir" : "Avaliar"}
                         </Link>
 
-                        <form action={doDuplicate.bind(null, r.id)}>
-                          <button
-                            className="text-sm text-slate-700 hover:underline"
-                            type="submit"
-                          >
-                            Duplicar
-                          </button>
-                        </form>
+                        {canDuplicate && (
+                          <form action={doDuplicate.bind(null, r.id)}>
+                            <button
+                              className="text-sm text-slate-700 hover:underline"
+                              type="submit"
+                            >
+                              Duplicar
+                            </button>
+                          </form>
+                        )}
 
-                        <ConfirmDeleteButton
-                          action={doDelete.bind(null, r.id)}
-                          disabled={!canDelete}
-                          title={
-                            !canDelete
-                              ? "Só é possível excluir quando o relatório está em rascunho."
-                              : "Excluir relatório"
-                          }
-                        />
+                        {canDelete && (
+                          <ConfirmDeleteButton
+                            action={doDelete.bind(null, r.id)}
+                            disabled={!isDraft}
+                            title={
+                              !isDraft
+                                ? "Só é possível excluir quando o relatório está em rascunho."
+                                : "Excluir relatório"
+                            }
+                          />
+                        )}
                       </div>
                     </td>
                   </tr>
